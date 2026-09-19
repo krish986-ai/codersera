@@ -102,6 +102,16 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     setTickets(getStoredTickets());
   };
 
+  useEffect(() => {
+    const handleStorageChange = (event: StorageEvent) => {
+      if (event.key === null || event.key.includes('ticket') || event.key.includes('event')) {
+        refreshData();
+      }
+    };
+    window.addEventListener('storage', handleStorageChange);
+    return () => window.removeEventListener('storage', handleStorageChange);
+  }, []);
+
   const handleAdminLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoginError('');
@@ -192,9 +202,15 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     if (found.checkedIn) {
       setScanResult({ status: 'already-checked', ticket: found });
     } else {
-      toggleTicketCheckIn(found.id);
-      refreshData();
-      setScanResult({ status: 'success', ticket: { ...found, checkedIn: true, checkedInAt: new Date().toISOString() } });
+      const checkInResult = toggleTicketCheckIn(found.id);
+      if (!checkInResult.success || !checkInResult.ticket) {
+        setScanResult({ status: 'not-found' });
+        return;
+      }
+      setTickets((currentTickets) => currentTickets.map((ticket) =>
+        ticket.id === checkInResult.ticket?.id ? checkInResult.ticket : ticket
+      ));
+      setScanResult({ status: 'success', ticket: checkInResult.ticket });
     }
   };
 

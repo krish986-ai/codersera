@@ -11,15 +11,38 @@ import { InfoSectionModal, InfoModalType } from './components/InfoSectionModal';
 import { NotificationToast, ToastMessage } from './components/NotificationToast';
 import { CommunityEvent, StudentTicket } from './types';
 import { getStoredEvents, getStoredTickets } from './lib/storage';
-import { ShieldCheck, Heart, Github, ExternalLink, Sparkles } from 'lucide-react';
+import { ShieldCheck, Heart, Github, ExternalLink, Sparkles, ArrowLeft } from 'lucide-react';
 import { CodersEraLogo } from './components/CodersEraLogo';
 
 export default function App() {
-  const [currentView, setCurrentView] = useState<'user-events' | 'user-register' | 'user-ticket' | 'user-lookup' | 'admin'>('user-events');
+  type AppView = 'user-events' | 'user-register' | 'user-ticket' | 'user-lookup' | 'admin';
+  const [currentView, setCurrentView] = useState<AppView>(() => {
+    const view = window.history.state?.coderseraView as AppView | undefined;
+    return view || 'user-events';
+  });
   
   const [events, setEvents] = useState<CommunityEvent[]>(() => getStoredEvents());
   const [selectedEvent, setSelectedEvent] = useState<CommunityEvent | null>(() => events[0] || null);
   const [activeTicket, setActiveTicket] = useState<StudentTicket | null>(null);
+
+  const navigateTo = (view: AppView, replace = false) => {
+    if (view === currentView && !replace) return;
+    const method = replace ? 'replaceState' : 'pushState';
+    window.history[method]({ coderseraView: view }, '', window.location.href);
+    setCurrentView(view);
+  };
+
+  useEffect(() => {
+    if (!window.history.state?.coderseraView) {
+      window.history.replaceState({ coderseraView: 'user-events' }, '', window.location.href);
+    }
+    const handleBrowserBack = () => {
+      const view = window.history.state?.coderseraView as AppView | undefined;
+      setCurrentView(view || 'user-events');
+    };
+    window.addEventListener('popstate', handleBrowserBack);
+    return () => window.removeEventListener('popstate', handleBrowserBack);
+  }, []);
 
   // Community & Info modals state
   const [communityModalOpen, setCommunityModalOpen] = useState(false);
@@ -64,13 +87,13 @@ export default function App() {
   // Switch to register view for an event
   const handleSelectEvent = (event: CommunityEvent) => {
     setSelectedEvent(event);
-    setCurrentView('user-register');
+    navigateTo('user-register');
   };
 
   // Called when student ticket is generated
   const handleTicketGenerated = (ticket: StudentTicket) => {
     setActiveTicket(ticket);
-    setCurrentView('user-ticket');
+    navigateTo('user-ticket');
     addToast(
       'success',
       'Pass Issued Successfully',
@@ -81,7 +104,7 @@ export default function App() {
   // View existing ticket
   const handleViewExistingTicket = (ticket: StudentTicket) => {
     setActiveTicket(ticket);
-    setCurrentView('user-ticket');
+    navigateTo('user-ticket');
   };
 
   // Admin login handlers
@@ -93,7 +116,7 @@ export default function App() {
   const handleAdminLogout = async () => {
     await fetch('/api/auth/logout', { method: 'POST', credentials: 'include' }).catch(() => undefined);
     setAdminAuthenticated(false);
-    setCurrentView('user-events');
+    navigateTo('user-events', true);
     addToast('info', 'Console Locked', 'Admin session has been terminated safely.');
   };
 
@@ -102,7 +125,7 @@ export default function App() {
       {/* Top CodersEra Navigation Bar matching codersera.in pill design */}
       <Navbar
         currentView={currentView}
-        setCurrentView={setCurrentView}
+        setCurrentView={navigateTo}
         adminAuthenticated={adminAuthenticated}
         onAdminLogout={handleAdminLogout}
         onOpenCommunityModal={() => setCommunityModalOpen(true)}
@@ -111,6 +134,19 @@ export default function App() {
 
       {/* Main Content View Switcher */}
       <main className="flex-1 w-full pb-16">
+        {currentView !== 'user-events' && (
+          <div className="max-w-7xl mx-auto px-4 pt-4">
+            <button
+              type="button"
+              onClick={() => window.history.back()}
+              className="inline-flex items-center gap-2 px-3 py-2 rounded-xl border border-[#27272a] bg-[#121215] text-slate-300 hover:text-white hover:border-cyan-500/50 text-xs font-mono transition-all"
+              aria-label="Go back to the previous page"
+            >
+              <ArrowLeft className="w-4 h-4" />
+              Back
+            </button>
+          </div>
+        )}
         {!authChecked && currentView === 'admin' && (
           <div className="max-w-md mx-auto py-16 px-4 text-center text-sm text-slate-400">Checking secure session…</div>
         )}
@@ -118,7 +154,7 @@ export default function App() {
           <EventList
             events={events}
             onSelectEvent={handleSelectEvent}
-            onGoToLookup={() => setCurrentView('user-lookup')}
+            onGoToLookup={() => navigateTo('user-lookup')}
           />
         )}
 
@@ -127,14 +163,14 @@ export default function App() {
             selectedEvent={selectedEvent}
             onTicketGenerated={handleTicketGenerated}
             onViewExistingTicket={handleViewExistingTicket}
-            onCancel={() => setCurrentView('user-events')}
+            onCancel={() => navigateTo('user-events')}
           />
         )}
 
         {currentView === 'user-ticket' && activeTicket && (
           <TicketBadge
             ticket={activeTicket}
-            onBack={() => setCurrentView('user-events')}
+            onBack={() => navigateTo('user-events')}
             showBackBtn={true}
           />
         )}
@@ -143,9 +179,9 @@ export default function App() {
           <TicketLookup
             onSelectTicket={(t) => {
               setActiveTicket(t);
-              setCurrentView('user-ticket');
+              navigateTo('user-ticket');
             }}
-            onGoToEvents={() => setCurrentView('user-events')}
+            onGoToEvents={() => navigateTo('user-events')}
           />
         )}
 
@@ -156,7 +192,7 @@ export default function App() {
             onLogout={handleAdminLogout}
             onViewTicket={(t) => {
               setActiveTicket(t);
-              setCurrentView('user-ticket');
+              navigateTo('user-ticket');
             }}
           />
         )}
@@ -254,7 +290,7 @@ export default function App() {
               </a>
               <span>•</span>
               <button
-                onClick={() => setCurrentView('admin')}
+                onClick={() => navigateTo('admin')}
                 className="hover:text-cyan-400 text-slate-400 transition-colors"
               >
                 Admin Command Center
