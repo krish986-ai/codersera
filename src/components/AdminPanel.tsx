@@ -182,6 +182,11 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
       return;
     }
 
+    if (raw.includes('|') && raw !== found.qrPayload) {
+      setScanResult({ status: 'not-found' });
+      return;
+    }
+
     if (found.checkedIn) {
       setScanResult({ status: 'already-checked', ticket: found });
     } else {
