@@ -1,8 +1,8 @@
-import { firestore } from '../_firebaseAdmin.js';
-import { requireAdmin } from '../_requireAdmin.js';
-import { jsonBody, methodNotAllowed } from '../_http.js';
+import { firestore } from './_firebaseAdmin.js';
+import { requireAdmin } from './_requireAdmin.js';
+import { jsonBody, methodNotAllowed } from './_http.js';
 import { randomUUID } from 'node:crypto';
-import { storageBucket } from '../_firebaseAdmin.js';
+import { storageBucket } from './_firebaseAdmin.js';
 
 const MAX_BYTES = 1.5 * 1024 * 1024;
 

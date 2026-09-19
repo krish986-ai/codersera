@@ -1,5 +1,5 @@
-import { jsonBody, methodNotAllowed } from '../_http.js';
-import { firestore } from '../_firebaseAdmin.js';
+import { jsonBody, methodNotAllowed } from './_http.js';
+import { firestore } from './_firebaseAdmin.js';
 import nodemailer from 'nodemailer';
 
 function generateOtp(): string {
