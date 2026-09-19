@@ -27,7 +27,10 @@ export default async function handler(request: any, response: any) {
       })) throw new Error('DUPLICATE');
       if (Number(event.availableSeats) <= 0) throw new Error('SOLD_OUT');
       tx.set(ticketRef, { ...ticket, email, rollNumber, eventTitle: event.title, createdAt: new Date().toISOString() });
-      tx.update(eventRef, { availableSeats: Number(event.availableSeats) - 1 });
+      tx.update(eventRef, {
+        availableSeats: Number(event.availableSeats) - 1,
+        generatedPasses: Number(event.generatedPasses ?? (Number(event.totalSeats) - Number(event.availableSeats))) + 1,
+      });
       return { ...ticket, email, rollNumber, eventTitle: event.title };
     });
     response.status(201).json(result);

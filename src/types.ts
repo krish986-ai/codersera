@@ -29,7 +29,10 @@ export interface CommunityEvent {
   description: string;
   totalSeats: number;
   availableSeats: number;
+  generatedPasses?: number;
   isActive: boolean;
+  isFeatured?: boolean;
+  featuredImageUrl?: string;
   bannerGradient?: string;
   speakers?: string[];
   tags?: string[];
@@ -93,4 +96,3 @@ export interface AdminStats {
   branchCounts: Record<string, number>;
   yearCounts: Record<string, number>;
 }
-

@@ -38,7 +38,7 @@ export const EventList: React.FC<EventListProps> = ({ events, onSelectEvent, onG
     return matchesSearch && matchesCategory;
   });
 
-  const flagshipEvent = events.find(e => e.id === 'evt-automate-india-2026') || events[0];
+  const flagshipEvent = events.find(e => e.isFeatured && e.isActive) || events.find(e => e.isActive) || events[0];
 
   return (
     <div className="max-w-7xl mx-auto py-8 sm:py-12 px-4 sm:px-6 lg:px-8 space-y-16">
@@ -155,14 +155,16 @@ export const EventList: React.FC<EventListProps> = ({ events, onSelectEvent, onG
           </div>
 
           <div className="relative rounded-3xl overflow-hidden bg-[#121215] border border-[#27272a] hover:border-cyan-500/40 transition-all p-6 sm:p-8 grid grid-cols-1 lg:grid-cols-12 gap-6 items-center shadow-xl">
-            {/* Banner image from official site */}
+            {/* Admin-managed event artwork */}
             <div className="lg:col-span-5 rounded-2xl overflow-hidden bg-[#09090b] border border-white/5 aspect-video flex items-center justify-center">
               <img
-                src="/automate-india.png"
-                alt="Automate India NIET Chapter 2026"
+                src={flagshipEvent.featuredImageUrl || '/automate-india.png'}
+                alt={`${flagshipEvent.title} featured artwork`}
                 className="w-full h-full object-cover hover:scale-105 transition-transform duration-500"
                 onError={(e) => {
-                  (e.target as HTMLImageElement).style.display = 'none';
+                  const image = e.target as HTMLImageElement;
+                  if (image.src.endsWith('/automate-india.png')) image.style.display = 'none';
+                  else image.src = '/automate-india.png';
                 }}
               />
             </div>
@@ -177,7 +179,7 @@ export const EventList: React.FC<EventListProps> = ({ events, onSelectEvent, onG
                   Team Size: 2-3 Members
                 </span>
                 <span className="px-3 py-1 rounded-md text-[11px] font-mono text-slate-400 bg-[#18181b] border border-[#27272a]">
-                  {flagshipEvent.totalSeats - flagshipEvent.availableSeats} Passes Generated
+                  {flagshipEvent.generatedPasses ?? (flagshipEvent.totalSeats - flagshipEvent.availableSeats)} Passes Generated
                 </span>
               </div>
 
@@ -352,7 +354,7 @@ export const EventList: React.FC<EventListProps> = ({ events, onSelectEvent, onG
             {filteredEvents.map((event) => {
               const seatsPercent = Math.min(
                 100,
-                Math.round(((event.totalSeats - event.availableSeats) / event.totalSeats) * 100)
+                Math.round(((event.generatedPasses ?? (event.totalSeats - event.availableSeats)) / event.totalSeats) * 100)
               );
 
               return (
@@ -370,7 +372,7 @@ export const EventList: React.FC<EventListProps> = ({ events, onSelectEvent, onG
                       </span>
                       <div className="flex items-center gap-1.5 text-[11px] font-mono text-cyan-400">
                         <Users className="w-3.5 h-3.5" />
-                        <span>{event.totalSeats - event.availableSeats} / {event.totalSeats} passes generated</span>
+                        <span>{event.generatedPasses ?? (event.totalSeats - event.availableSeats)} / {event.totalSeats} passes generated</span>
                       </div>
                     </div>
 

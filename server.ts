@@ -8,6 +8,7 @@ import adminEventsHandler from './api/admin/events.ts';
 import adminTicketsHandler from './api/admin/tickets.ts';
 import adminCheckInHandler from './api/admin/check-in.ts';
 import adminCleanupHandler from './api/admin/cleanup-images.ts';
+import adminEventImageHandler from './api/admin/event-image.ts';
 import { createSession, expiredSessionCookie, isAuthenticated, sessionCookie } from './api/_auth.ts';
 
 config({ path: '.env.local' });
@@ -23,7 +24,7 @@ if (!adminPassword || adminPassword.length < 12) {
 
 const passwordSalt = randomBytes(16);
 const passwordHash = scryptSync(adminPassword, passwordSalt, 64);
-app.use(express.json({ limit: '2mb' }));
+app.use(express.json({ limit: '2.5mb' }));
 
 app.get('/api/auth/session', (request, response) => {
   response.json({ authenticated: isAuthenticated(request) });
@@ -55,6 +56,7 @@ app.all('/api/admin/events', (request, response) => void adminEventsHandler(requ
 app.all('/api/admin/tickets', (request, response) => void adminTicketsHandler(request, response));
 app.post('/api/admin/check-in', (request, response) => void adminCheckInHandler(request, response));
 app.post('/api/admin/cleanup-images', (request, response) => void adminCleanupHandler(request, response));
+app.post('/api/admin/event-image', (request, response) => void adminEventImageHandler(request, response));
 
 app.get('/api/admin/health', (request, response) => {
   if (!isAuthenticated(request)) {

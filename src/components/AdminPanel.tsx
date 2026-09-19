@@ -11,7 +11,7 @@ import { CommunityEvent, StudentTicket, FilterOptions, Branch, AcademicYear } fr
 import { 
   getStoredEvents, saveEvents, getStoredTickets, saveTickets, 
   toggleTicketCheckIn, cleanupAttendeeImages, updateStudentTicket, deleteStudentTicket,
-  addCommunityEvent, updateCommunityEvent, deleteCommunityEvent, toggleEventStatus
+  addCommunityEvent, updateCommunityEvent, deleteCommunityEvent, toggleEventStatus, uploadEventFeaturedImage
 } from '../lib/storage';
 import { exportTicketsToCsv } from '../lib/exportExcel';
 import { CodersEraLogo } from './CodersEraLogo';
@@ -73,6 +73,9 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     venue: '',
     totalSeats: 250,
     availableSeats: 250,
+    isFeatured: false,
+    featuredImageUrl: '',
+    featuredImageFile: null as File | null,
     description: '',
     isActive: true,
     tags: 'Web3, AI, FullStack',
@@ -378,6 +381,9 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
       venue: 'Main Tech Center & Virtual Live',
       totalSeats: 300,
       availableSeats: 300,
+      isFeatured: false,
+      featuredImageUrl: '',
+      featuredImageFile: null,
       description: 'Join developers, builders, and designers for an intensive engineering session with CodersEra.',
       isActive: true,
       tags: 'FullStack, AI, OpenSource',
@@ -398,6 +404,9 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
       venue: evt.venue,
       totalSeats: evt.totalSeats,
       availableSeats: evt.availableSeats,
+      isFeatured: Boolean(evt.isFeatured),
+      featuredImageUrl: evt.featuredImageUrl || '',
+      featuredImageFile: null,
       description: evt.description,
       isActive: evt.isActive,
       tags: evt.tags ? evt.tags.join(', ') : '',
@@ -432,10 +441,16 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
         venue: eventFormData.venue.trim(),
         totalSeats: Number(eventFormData.totalSeats),
         availableSeats: Number(eventFormData.availableSeats),
+        isFeatured: eventFormData.isFeatured,
+        featuredImageUrl: eventFormData.featuredImageUrl || undefined,
         description: eventFormData.description.trim(),
         isActive: eventFormData.isActive,
         tags: tagsArray,
       });
+      if (eventFormData.featuredImageFile) {
+        const url = await uploadEventFeaturedImage(editingEventId, eventFormData.featuredImageFile);
+        await updateCommunityEvent(editingEventId, { featuredImageUrl: url });
+      }
       setEventActionSuccess(`Event "${eventFormData.title}" updated successfully.`);
     } else {
       // Add new
@@ -448,6 +463,8 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
         venue: eventFormData.venue.trim(),
         totalSeats: Number(eventFormData.totalSeats),
         availableSeats: Number(eventFormData.availableSeats),
+        isFeatured: eventFormData.isFeatured,
+        featuredImageUrl: eventFormData.featuredImageUrl || undefined,
         description: eventFormData.description.trim(),
         isActive: eventFormData.isActive,
         tags: tagsArray,
@@ -1265,6 +1282,35 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                 </div>
               </div>
 
+              {/* Featured event presentation */}
+              <div className="rounded-xl border border-cyan-500/20 bg-cyan-950/10 p-4 space-y-3">
+                <label className="flex items-center gap-3 text-slate-200">
+                  <input
+                    type="checkbox"
+                    checked={eventFormData.isFeatured}
+                    onChange={(e) => setEventFormData({ ...eventFormData, isFeatured: e.target.checked })}
+                    className="h-4 w-4 accent-cyan-400"
+                  />
+                  <span>Display this event as the public featured event</span>
+                </label>
+                <div>
+                  <label className="block text-slate-300 mb-1">Featured image</label>
+                  <input
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp,image/gif"
+                    disabled={!editingEventId}
+                    onChange={(e) => setEventFormData({ ...eventFormData, featuredImageFile: e.target.files?.[0] || null })}
+                    className="w-full text-slate-300 file:mr-3 file:rounded-lg file:border-0 file:bg-cyan-500 file:px-3 file:py-2 file:text-xs file:font-semibold file:text-slate-950"
+                  />
+                  <p className="mt-1 text-[10px] text-slate-500">
+                    {editingEventId ? 'JPG, PNG, WEBP, or GIF up to 1.5 MB.' : 'Save the event first, then upload its featured image.'}
+                  </p>
+                  {eventFormData.featuredImageUrl && (
+                    <img src={eventFormData.featuredImageUrl} alt="Current featured artwork" className="mt-3 h-24 w-full rounded-lg object-cover" />
+                  )}
+                </div>
+              </div>
+
               {/* Date & Time */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
@@ -1326,12 +1372,12 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                 </div>
 
                 <div>
-                  <label className="block text-slate-300 mb-1">Available Seats Left</label>
+                  <label className="block text-slate-300 mb-1">Seats Remaining (calculated)</label>
                   <input
                     type="number"
                     min={0}
                     value={eventFormData.availableSeats}
-                    onChange={(e) => setEventFormData({ ...eventFormData, availableSeats: Number(e.target.value) })}
+                    readOnly
                     className="w-full px-3.5 py-2.5 rounded-xl bg-[#18181b] border border-[#27272a] text-white focus:border-cyan-400 focus:outline-none"
                   />
                 </div>
