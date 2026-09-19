@@ -1,6 +1,6 @@
-import { firestore } from './_firebaseAdmin.js';
+import { firestore } from '../lib/_firebaseAdmin.js';
 import { INITIAL_EVENTS } from '../src/lib/storage.js';
-import { methodNotAllowed } from './_http.js';
+import { methodNotAllowed } from '../lib/_http.js';
 
 export default async function handler(request: any, response: any) {
   if (request.method !== 'GET') return methodNotAllowed(response, ['GET']);

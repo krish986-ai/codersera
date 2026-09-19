@@ -4,11 +4,11 @@ import { randomBytes, scryptSync, timingSafeEqual } from 'node:crypto';
 import nodemailer from 'nodemailer';
 import eventsHandler from './api/events.ts';
 import registrationHandler from './api/registration.ts';
-import lookupHandler from './api/tickets/lookup.ts';
+import lookupHandler from './api/lookup.ts';
 import adminHandler from './api/admin.ts';
 import authHandler from './api/auth.ts';
 import otpHandler from './api/otp.ts';
-import { createSession, expiredSessionCookie, isAuthenticated, sessionCookie } from './api/_auth.ts';
+import { createSession, expiredSessionCookie, isAuthenticated, sessionCookie } from './lib/_auth.ts';
 
 config({ path: '.env.local' });
 config();

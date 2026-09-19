@@ -1,6 +1,6 @@
 import { scryptSync, timingSafeEqual } from 'node:crypto';
-import { createSession, sessionCookie, expiredSessionCookie, isAuthenticated } from './_auth.js';
-import { noStore, methodNotAllowed } from './_http.js';
+import { createSession, sessionCookie, expiredSessionCookie, isAuthenticated } from '../lib/_auth.js';
+import { noStore, methodNotAllowed } from '../lib/_http.js';
 
 export default function handler(request: any, response: any) {
   noStore(response);
