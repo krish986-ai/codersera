@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Search, Ticket, ArrowRight, AlertCircle } from 'lucide-react';
 import { StudentTicket } from '../types';
-import { getStoredTickets } from '../lib/storage';
+import { findTicketsByEmail } from '../lib/storage';
 
 interface TicketLookupProps {
   onSelectTicket: (ticket: StudentTicket) => void;
@@ -21,9 +21,8 @@ export const TicketLookup: React.FC<TicketLookupProps> = ({ onSelectTicket, onGo
 
     setIsSearching(true); setSearchError('');
     try {
-      const allTickets = await getStoredTickets();
-      const clean = query.trim().toLowerCase();
-      setResults(allTickets.filter(t => t.email.toLowerCase() === clean || t.rollNumber.toLowerCase() === clean || t.id.toLowerCase() === clean));
+      const matches = await findTicketsByEmail(query.trim());
+      setResults(matches);
       setHasSearched(true);
     } catch (error: unknown) {
       setSearchError(error instanceof Error ? error.message : 'Unable to search tickets.');

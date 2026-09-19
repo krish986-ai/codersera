@@ -20,6 +20,8 @@ View the original app in AI Studio: https://ai.studio/apps/1624c828-0238-494d-8b
 
 ## Data and security notes
 
-Without Firebase, event and ticket data is stored in the current browser's local storage and is not shared between devices. Cloud synchronization is optional and failures are reported in the browser console.
+Firestore is private: browser code only calls the `/api` serverless routes. Deploy `firestore.rules` to deny all client access. Public routes expose active event summaries, narrowly scoped ticket lookup, and registration; all attendee administration and check-in require the signed admin session.
+
+On Vercel, configure `FIREBASE_PROJECT_ID`, `FIREBASE_CLIENT_EMAIL`, and `FIREBASE_PRIVATE_KEY` from a Firebase service-account JSON key (store the key only as an encrypted server environment variable). Also configure `ADMIN_PASSWORD` and a random `AUTH_SECRET` of at least 32 characters. The `VITE_FIREBASE_*` client credentials are no longer required.
 
 The admin console uses a local Express authentication server with scrypt password verification, expiring HttpOnly session cookies, and server-side session checks. The in-memory session store is intended for local development only; use a persistent session store, HTTPS, rate limiting, and a production identity provider before deployment. Never deploy Firestore with public read/write rules.

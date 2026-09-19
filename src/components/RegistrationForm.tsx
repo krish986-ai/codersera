@@ -6,8 +6,7 @@ import {
 } from 'lucide-react';
 import { CommunityEvent, StudentTicket, Branch, AcademicYear } from '../types';
 import { 
-  findExistingTicket, generateUniqueTicketId, saveTickets, getStoredTickets,
-  getStoredEvents, saveEvents
+  findExistingTicket, generateUniqueTicketId, saveTickets
 } from '../lib/storage';
 import {
   completeRegistrationEmailLink,
@@ -207,18 +206,10 @@ export const RegistrationForm: React.FC<RegistrationFormProps> = ({
         gdprConsent: true,
       };
 
-      await saveTickets([newTicket]);
-
-      // Decrement available seat count in event
-      const allEvents = await getStoredEvents();
-      const eventIdx = allEvents.findIndex(ev => ev.id === selectedEvent.id);
-      if (eventIdx !== -1 && allEvents[eventIdx].availableSeats > 0) {
-        allEvents[eventIdx].availableSeats -= 1;
-        await saveEvents([allEvents[eventIdx]]);
-      }
+      const createdTicket = await saveTickets([newTicket]);
 
       setIsVerifying(false);
-      onTicketGenerated(newTicket);
+      onTicketGenerated(createdTicket || newTicket);
       })
       .catch(() => {
         setIsVerifying(false);

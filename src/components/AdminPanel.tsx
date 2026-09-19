@@ -177,7 +177,8 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
 
   // Toggle CheckIn
   const handleCheckInToggle = async (ticketId: string) => {
-    await toggleTicketCheckIn(ticketId);
+    const ticket = tickets.find((candidate) => candidate.id === ticketId);
+    await toggleTicketCheckIn(ticketId, ticket?.qrPayload);
     await refreshData();
   };
 
@@ -201,7 +202,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     if (found.checkedIn) {
       setScanResult({ status: 'already-checked', ticket: found });
     } else {
-      const checkInResult = await toggleTicketCheckIn(found.id);
+      const checkInResult = await toggleTicketCheckIn(found.id, raw.includes('|') ? raw : undefined);
       if (!checkInResult.success || !checkInResult.ticket) {
         setScanResult({ status: 'not-found' });
         return;

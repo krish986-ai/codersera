@@ -1,14 +1,4 @@
 import { initializeApp, getApps, deleteApp, FirebaseApp } from 'firebase/app';
-import { 
-  getFirestore, 
-  Firestore, 
-  doc, 
-  getDocFromServer, 
-  setDoc, 
-  collection, 
-  getDocs,
-  serverTimestamp
-} from 'firebase/firestore';
 import { getAuth, Auth, isSignInWithEmailLink, sendSignInLinkToEmail, signInWithEmailLink } from 'firebase/auth';
 import { StudentTicket } from '../types';
 
@@ -98,7 +88,6 @@ export async function clearStoredFirebaseConfig() {
 }
 
 let app: FirebaseApp | null = null;
-let db: Firestore | null = null;
 let auth: Auth | null = null;
 
 export async function resetFirebaseApp() {
@@ -111,13 +100,12 @@ export async function resetFirebaseApp() {
     // Ignore cleanup error
   }
   app = null;
-  db = null;
   auth = null;
 }
 
 export function getFirebaseInstance(overrideConfig?: FirebaseCustomConfig | null) {
-  if (app && db && auth && !overrideConfig) {
-    return { app, db, auth, isConfigured: true };
+  if (app && auth && !overrideConfig) {
+    return { app, auth, isConfigured: true };
   }
 
   const userCfg = overrideConfig || getStoredFirebaseConfig();
@@ -136,15 +124,14 @@ export function getFirebaseInstance(overrideConfig?: FirebaseCustomConfig | null
       } else {
         app = existing[0];
       }
-      db = getFirestore(app);
       auth = getAuth(app);
-      return { app, db, auth, isConfigured: true };
+      return { app, auth, isConfigured: true };
     } catch (e) {
       console.warn('Firebase initialization with stored config failed:', e);
     }
   }
 
-  return { app: null, db: null, auth: null, isConfigured: false };
+  return { app: null, auth: null, isConfigured: false };
 }
 
 export async function sendRegistrationEmailLink(email: string): Promise<boolean> {
@@ -340,46 +327,11 @@ export async function testFirestoreConnection(
     }
   }
 
-  // LAYER 2: Live Firebase SDK Verification
+  // Data access is deliberately tested through the server boundary, never from the browser.
   try {
-    await resetFirebaseApp();
-    const { db: firestoreDb, isConfigured } = getFirebaseInstance(cfg);
-
-    if (!isConfigured || !firestoreDb) {
-      return {
-        success: false,
-        status: 'error',
-        title: 'Initialization Failed',
-        message: 'Could not initialize Firebase Client SDK with the provided credentials.',
-        suggestedAction: 'Check your API Key, Project ID, and App ID values.',
-      };
-    }
-
-    // Try a test read with 5 second timeout
-    const readPromise = getDocFromServer(doc(firestoreDb, 'codersera_system', 'ping'));
-    const timeoutPromise = new Promise((_, reject) => 
-      setTimeout(() => reject(new Error('SDK_TIMEOUT')), 5000)
-    );
-
-    await Promise.race([readPromise, timeoutPromise]);
-
-    if (customConfig) {
-      saveStoredFirebaseConfig(customConfig);
-    }
-
-    return {
-      success: true,
-      status: 'connected',
-      title: 'Full Firestore Connection Established!',
-      message: `Successfully connected to Cloud Firestore on project "${projectId}"!`,
-      details: [
-        '✓ Firebase SDK client initialized',
-        `✓ Project "${projectId}" is active`,
-        '✓ Real-time tickets and registrations sync is ready',
-      ],
-    };
-  } catch (sdkErr: unknown) {
-    const errMessage = sdkErr instanceof Error ? sdkErr.message : String(sdkErr);
+    const response = await fetch('/api/events');
+    if (response.ok) return { success: true, status: 'connected', title: 'Secure API connection established', message: 'Event data is available through the protected server boundary.' };
+    const errMessage = `API returned ${response.status}`;
 
     if (errMessage.includes('permission-denied') || errMessage.includes('Missing or insufficient permissions')) {
       if (customConfig) {
@@ -390,12 +342,12 @@ export async function testFirestoreConnection(
         success: true,
         status: 'connected_rules_locked',
         title: 'Connected to Firestore (Rules Locked)',
-        message: 'Connected to your Cloud Firestore database! Your current rules require updating to allow client tickets to write.',
+        message: 'Firestore is private and server-side API access is required.',
         details: [
           '✓ Database connection verified',
-          '⚠️ Set Firestore security rules in Firebase Console to allow read & write.',
+          '✓ Client reads and writes are denied by Firestore rules.',
         ],
-        suggestedAction: 'Go to Firebase Console > Firestore Database > Rules tab to update your rules.',
+        suggestedAction: 'Configure the Firebase Admin service-account variables on Vercel.',
         suggestedRules: `rules_version = '2';\nservice cloud.firestore {\n  match /databases/{database}/documents {\n    match /{document=**} {\n      allow read, write: if false;\n    }\n  }\n}`,
       };
     }
@@ -408,7 +360,7 @@ export async function testFirestoreConnection(
         message: 'Could not connect to Cloud Firestore. In 90% of cases, this means the Firestore Database has not been created in Firebase Console yet.',
         details: [
           'Make sure you have clicked "Create database" under Firestore Database in Firebase Console.',
-          'Choose "Start in test mode" during database creation.',
+          'Deploy the repository firestore.rules file (deny by default).',
         ],
         suggestedAction: 'Open console.firebase.google.com, open your project, click "Firestore Database" and click "Create database".',
       };
@@ -421,6 +373,8 @@ export async function testFirestoreConnection(
       message: `Connection attempt returned: ${errMessage}`,
       suggestedAction: 'Check your API Key and Project ID. Ensure Cloud Firestore is enabled in Firebase Console.',
     };
+  } catch {
+    return { success: false, status: 'network_error', title: 'Secure API unavailable', message: 'The server-side Firebase API could not be reached.', suggestedAction: 'Configure the Firebase Admin service-account variables on Vercel.' };
   }
 }
 
@@ -428,20 +382,7 @@ export async function testFirestoreConnection(
  * Cloud Sync Feature: Upload ticket to Cloud Firestore
  */
 export async function syncTicketToCloud(ticket: StudentTicket): Promise<boolean> {
-  const { db } = getFirebaseInstance();
-  if (!db) return false;
-
-  try {
-    const ticketDoc = doc(db, 'tickets', ticket.id);
-    await setDoc(ticketDoc, {
-      ...ticket,
-      cloudSyncedAt: new Date().toISOString(),
-    }, { merge: true });
-    return true;
-  } catch (err) {
-    console.warn('Could not sync ticket to Cloud Firestore:', err);
-    return false;
-  }
+  try { const response = await fetch('/api/registration', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ticket }) }); return response.ok; } catch { return false; }
 }
 
 /**
@@ -450,47 +391,18 @@ export async function syncTicketToCloud(ticket: StudentTicket): Promise<boolean>
 export async function syncAllTicketsToCloud(
   tickets: StudentTicket[]
 ): Promise<{ success: boolean; count: number; error?: string }> {
-  const { db } = getFirebaseInstance();
-  if (!db) {
-    return { success: false, count: 0, error: 'Firebase is not configured yet.' };
-  }
-
   let count = 0;
-  try {
-    for (const ticket of tickets) {
-      const ticketDoc = doc(db, 'tickets', ticket.id);
-      await setDoc(ticketDoc, {
-        ...ticket,
-        cloudSyncedAt: new Date().toISOString(),
-      }, { merge: true });
-      count++;
-    }
-    return { success: true, count };
-  } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : String(err);
-    return { success: false, count, error: msg };
-  }
+  for (const ticket of tickets) if (await syncTicketToCloud(ticket)) count++;
+  return { success: count === tickets.length, count, error: count === tickets.length ? undefined : 'One or more registrations failed.' };
 }
 
 /**
  * Cloud Sync Feature: Fetch tickets from Cloud Firestore
  */
 export async function fetchTicketsFromCloud(): Promise<{ success: boolean; tickets: StudentTicket[]; error?: string }> {
-  const { db } = getFirebaseInstance();
-  if (!db) {
-    return { success: false, tickets: [], error: 'Firebase is not configured yet.' };
-  }
-
   try {
-    const colRef = collection(db, 'tickets');
-    const snapshot = await getDocs(colRef);
-    const tickets: StudentTicket[] = [];
-    snapshot.forEach((docSnap) => {
-      tickets.push(docSnap.data() as StudentTicket);
-    });
-    return { success: true, tickets };
-  } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : String(err);
-    return { success: false, tickets: [], error: msg };
-  }
+    const response = await fetch('/api/admin/tickets', { credentials: 'include' });
+    if (!response.ok) return { success: false, tickets: [], error: 'Administrator authentication required.' };
+    return { success: true, tickets: await response.json() as StudentTicket[] };
+  } catch (err) { return { success: false, tickets: [], error: err instanceof Error ? err.message : String(err) }; }
 }
