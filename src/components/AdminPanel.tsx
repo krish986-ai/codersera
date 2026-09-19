@@ -564,7 +564,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                 required
                 value={passwordInput}
                 onChange={(e) => setPasswordInput(e.target.value)}
-                placeholder="Enter password (@@cd_tic.1215)"
+                placeholder="Enter admin authorization key"
                 className="w-full pl-10 pr-4 py-3 rounded-xl bg-[#18181b] border border-[#27272a] text-white placeholder:text-slate-500 text-sm focus:border-cyan-400 focus:outline-none font-mono"
               />
               <KeyRound className="w-4 h-4 text-slate-500 absolute left-3.5 top-3.5" />
@@ -579,9 +579,9 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
             </button>
           </form>
 
-          <p className="mt-4 text-[10px] text-slate-500 font-mono">
-            Default pass: <code className="text-cyan-400">@@cd_tic.1215</code>
-          </p>
+          <div className="mt-4 flex items-center justify-center gap-1.5 text-[10px] text-slate-500 font-mono">
+            <span>Authorized access only • Default key: <code className="text-cyan-400">@@cd_tic.1215</code></span>
+          </div>
         </div>
       </div>
     );
@@ -960,12 +960,13 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                   <option value="all">All Tracks</option>
                   <option value="Full Stack & Web Development">Full Stack & Web</option>
                   <option value="Artificial Intelligence & Machine Learning">AI & Machine Learning</option>
-                  <option value="Blockchain & Web3 Engineering">Blockchain & Web3</option>
                   <option value="Cloud Computing & DevOps">Cloud & DevOps</option>
                   <option value="Cybersecurity & Systems">Cybersecurity & Systems</option>
-                  <option value="Computer Science & Engineering (CSE)">CSE</option>
-                  <option value="Information Technology (IT)">IT</option>
+                  <option value="Blockchain & Web3 Engineering">Blockchain & Web3</option>
+                  <option value="Mobile & App Engineering">Mobile & App</option>
                   <option value="UI/UX & Product Design">UI/UX & Product</option>
+                  <option value="Computer Science & Engineering">Computer Science</option>
+                  <option value="Open Source & General Engineering">Open Source & General</option>
                 </select>
               </div>
 
@@ -977,10 +978,10 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                   className="w-full px-2.5 py-1.5 rounded-lg bg-[#18181b] border border-[#27272a] text-slate-300 text-xs focus:border-cyan-400 focus:outline-none"
                 >
                   <option value="all">All Stages</option>
-                  <option value="1st / 2nd Year Student">1st / 2nd Year</option>
-                  <option value="3rd / 4th Year Student">3rd / 4th Year</option>
-                  <option value="Master's / Postgraduate">Master's / Postgrad</option>
-                  <option value="Self-Taught / Professional">Professional</option>
+                  <option value="Student Developer (1st / 2nd Year)">Student (1st/2nd Year)</option>
+                  <option value="Senior Student (3rd / 4th Year)">Senior (3rd/4th Year)</option>
+                  <option value="Postgraduate / Researcher">Postgrad / Researcher</option>
+                  <option value="Working Professional / Builder">Professional / Builder</option>
                 </select>
               </div>
             </div>
@@ -994,7 +995,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                   <tr className="bg-[#18181b] border-b border-[#27272a] text-slate-400">
                     <th className="py-3 px-4">Pass ID</th>
                     <th className="py-3 px-4">Attendee Name</th>
-                    <th className="py-3 px-4">Roll / Student ID</th>
+                    <th className="py-3 px-4">Attendee / Roll ID</th>
                     <th className="py-3 px-4">Track & Stage</th>
                     <th className="py-3 px-4">Event</th>
                     <th className="py-3 px-4 text-center">Status</th>
@@ -1095,7 +1096,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                             <button
                               onClick={() => requestDeleteStudent(t.id)}
                               className="p-1.5 rounded-lg bg-[#18181b] hover:bg-red-950 text-red-400"
-                              title="Delete Record (Requires @#cde_09)"
+                              title="Delete Attendee Record (Requires Admin Level 2)"
                             >
                               <Trash2 className="w-3.5 h-3.5" />
                             </button>
@@ -1833,7 +1834,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-slate-400 mb-1">Roll / Student ID</label>
+                  <label className="block text-slate-400 mb-1">Attendee / Roll ID</label>
                   <input
                     type="text"
                     required
@@ -1854,15 +1855,60 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                 </div>
               </div>
 
-              <div>
-                <label className="block text-slate-400 mb-1">Email</label>
-                <input
-                  type="email"
-                  required
-                  value={editingTicket.email}
-                  onChange={(e) => setEditingTicket({ ...editingTicket, email: e.target.value })}
-                  className="w-full px-3 py-2 rounded-xl bg-[#18181b] border border-[#27272a] text-white focus:border-cyan-400 focus:outline-none"
-                />
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-slate-400 mb-1">Email</label>
+                  <input
+                    type="email"
+                    required
+                    value={editingTicket.email}
+                    onChange={(e) => setEditingTicket({ ...editingTicket, email: e.target.value })}
+                    className="w-full px-3 py-2 rounded-xl bg-[#18181b] border border-[#27272a] text-white focus:border-cyan-400 focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-slate-400 mb-1">Institution / College</label>
+                  <input
+                    type="text"
+                    value={editingTicket.collegeName || ''}
+                    onChange={(e) => setEditingTicket({ ...editingTicket, collegeName: e.target.value })}
+                    className="w-full px-3 py-2 rounded-xl bg-[#18181b] border border-[#27272a] text-white focus:border-cyan-400 focus:outline-none"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-slate-400 mb-1">Developer Track</label>
+                  <select
+                    value={editingTicket.branch}
+                    onChange={(e) => setEditingTicket({ ...editingTicket, branch: e.target.value as Branch })}
+                    className="w-full px-2.5 py-2 rounded-xl bg-[#18181b] border border-[#27272a] text-white text-xs focus:border-cyan-400 focus:outline-none"
+                  >
+                    <option value="Full Stack & Web Development">Full Stack & Web</option>
+                    <option value="Artificial Intelligence & Machine Learning">AI & Machine Learning</option>
+                    <option value="Cloud Computing & DevOps">Cloud & DevOps</option>
+                    <option value="Cybersecurity & Systems">Cybersecurity & Systems</option>
+                    <option value="Blockchain & Web3 Engineering">Blockchain & Web3</option>
+                    <option value="Mobile & App Engineering">Mobile & App</option>
+                    <option value="UI/UX & Product Design">UI/UX & Product</option>
+                    <option value="Computer Science & Engineering">Computer Science</option>
+                    <option value="Open Source & General Engineering">Open Source & General</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-slate-400 mb-1">Experience Stage</label>
+                  <select
+                    value={editingTicket.year}
+                    onChange={(e) => setEditingTicket({ ...editingTicket, year: e.target.value as AcademicYear })}
+                    className="w-full px-2.5 py-2 rounded-xl bg-[#18181b] border border-[#27272a] text-white text-xs focus:border-cyan-400 focus:outline-none"
+                  >
+                    <option value="Student Developer (1st / 2nd Year)">Student (1st/2nd Year)</option>
+                    <option value="Senior Student (3rd / 4th Year)">Senior (3rd/4th Year)</option>
+                    <option value="Postgraduate / Researcher">Postgrad / Researcher</option>
+                    <option value="Working Professional / Builder">Professional / Builder</option>
+                  </select>
+                </div>
               </div>
 
               <div className="flex justify-end gap-2 pt-2">
@@ -1897,10 +1943,10 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
         }
         actionDescription={
           pendingAction?.type === 'delete_event'
-            ? 'This will permanently remove the event from the database. Please enter the master password (@#cde_09).'
+            ? 'This will permanently remove the event from the database. Please enter your Level 2 authorization key to confirm.'
             : pendingAction?.type === 'cleanup'
-            ? 'This action replaces base64 photos with placeholder badges to conserve server storage. Requires @#cde_09.'
-            : 'Please enter master administrator authorization password (@#cde_09) to confirm.'
+            ? 'This action replaces base64 photos with placeholder badges to conserve server storage. Requires Level 2 authorization.'
+            : 'Please enter Level 2 administrator authorization key to confirm.'
         }
         onAuthenticated={executeAuthorizedAction}
         onClose={() => {

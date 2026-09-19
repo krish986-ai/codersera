@@ -75,7 +75,7 @@ DTSTAMP:${new Date().toISOString().replace(/[-:]/g, '').split('.')[0]}Z
 DTSTART:20260822T040000Z
 DTEND:20260822T113000Z
 SUMMARY:${ticket.eventTitle} - CodersEra
-DESCRIPTION:CodersEra Event Pass: ${ticket.id}\\nAttendee: ${ticket.fullName}\\nRoll / Student ID: ${ticket.rollNumber}
+DESCRIPTION:CodersEra Event Pass: ${ticket.id}\\nAttendee: ${ticket.fullName}\\nAttendee ID: ${ticket.rollNumber}
 LOCATION:CodersEra Event Venue
 STATUS:CONFIRMED
 END:VEVENT
@@ -240,24 +240,24 @@ END:VCALENDAR`;
 
             <div className="grid grid-cols-2 gap-2 text-xs font-mono">
               <div>
-                <span className="text-[10px] text-slate-500 block uppercase">Student ID / Roll</span>
+                <span className="text-[10px] text-slate-500 block uppercase">Attendee / Roll ID</span>
                 <span className="text-cyan-300 font-semibold">{ticket.rollNumber}</span>
               </div>
               <div>
-                <span className="text-[10px] text-slate-500 block uppercase">Academic Stage</span>
+                <span className="text-[10px] text-slate-500 block uppercase">Level / Stage</span>
                 <span className="text-slate-300">{ticket.year}</span>
               </div>
             </div>
 
             {ticket.collegeName && (
               <div>
-                <span className="text-[10px] text-slate-500 block uppercase font-mono">College / Org</span>
+                <span className="text-[10px] text-slate-500 block uppercase font-mono">Institution / Organization</span>
                 <span className="text-xs text-slate-300 font-mono truncate block">{ticket.collegeName}</span>
               </div>
             )}
 
             <div>
-              <span className="text-[10px] text-slate-500 block uppercase font-mono">Specialization / Dept</span>
+              <span className="text-[10px] text-slate-500 block uppercase font-mono">Developer Track</span>
               <span className="text-xs text-sky-300 font-mono truncate block">{ticket.branch}</span>
             </div>
 

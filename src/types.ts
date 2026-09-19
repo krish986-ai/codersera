@@ -1,19 +1,22 @@
 export type Branch = 
   | 'Full Stack & Web Development'
   | 'Artificial Intelligence & Machine Learning'
-  | 'Blockchain & Web3 Engineering'
   | 'Cloud Computing & DevOps'
   | 'Cybersecurity & Systems'
-  | 'Computer Science & Engineering (CSE)'
-  | 'Information Technology (IT)'
+  | 'Blockchain & Web3 Engineering'
+  | 'Mobile & App Engineering'
   | 'UI/UX & Product Design'
-  | 'Other Engineering / Tech';
+  | 'Computer Science & Engineering'
+  | 'Open Source & General Engineering';
 
 export type AcademicYear = 
-  | '1st / 2nd Year Student'
-  | '3rd / 4th Year Student'
-  | 'Master\'s / Postgraduate'
-  | 'Self-Taught / Professional';
+  | 'Student Developer (1st / 2nd Year)'
+  | 'Senior Student (3rd / 4th Year)'
+  | 'Postgraduate / Researcher'
+  | 'Working Professional / Builder';
+
+export type DeveloperTrack = Branch;
+export type ExperienceStage = AcademicYear;
 
 export interface CommunityEvent {
   id: string;
@@ -33,19 +36,19 @@ export interface CommunityEvent {
 }
 
 export interface StudentTicket {
-  id: string; // Unique Ticket Number, e.g., CE-2026-7841-X7
+  id: string; // Unique Ticket / Pass ID, e.g., CE-2026-7841-X7
   eventId: string;
   eventTitle: string;
   fullName: string;
   email: string;
-  rollNumber: string; // Student ID / College Roll Number
-  collegeName?: string;
-  branch: Branch;
-  year: AcademicYear;
+  rollNumber: string; // Attendee ID / Student Roll Number
+  collegeName?: string; // Institution / Organization / University
+  branch: Branch; // Developer Track / Domain
+  year: AcademicYear; // Stage / Experience Level
   phoneNumber: string;
   githubUrl?: string;
   linkedinUrl?: string;
-  photoBase64?: string; // photo under 1MB, can be cleaned up later by admin
+  photoBase64?: string; // photo under 1MB
   isPhotoCleanedUp?: boolean;
   isVerified: boolean;
   verificationCode?: string;
@@ -55,6 +58,8 @@ export interface StudentTicket {
   qrPayload: string;
   gdprConsent: boolean;
 }
+
+export type AttendeeTicket = StudentTicket;
 
 export interface RegistrationFormData {
   eventId: string;
@@ -88,3 +93,4 @@ export interface AdminStats {
   branchCounts: Record<string, number>;
   yearCounts: Record<string, number>;
 }
+

@@ -50,10 +50,24 @@ export function sanitizeConfigValue(val: string | undefined): string {
     .trim();
 }
 
+export function getEnvFirebaseConfig(): FirebaseCustomConfig | null {
+  const apiKey = (import.meta.env.VITE_FIREBASE_API_KEY as string | undefined) || '';
+  const projectId = (import.meta.env.VITE_FIREBASE_PROJECT_ID as string | undefined) || '';
+  if (!apiKey || !projectId) return null;
+  return {
+    apiKey: sanitizeConfigValue(apiKey),
+    authDomain: sanitizeConfigValue(import.meta.env.VITE_FIREBASE_AUTH_DOMAIN as string | undefined) || `${projectId}.firebaseapp.com`,
+    projectId: sanitizeConfigValue(projectId),
+    storageBucket: sanitizeConfigValue(import.meta.env.VITE_FIREBASE_STORAGE_BUCKET as string | undefined) || `${projectId}.firebasestorage.app`,
+    messagingSenderId: sanitizeConfigValue(import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID as string | undefined) || '1234567890',
+    appId: sanitizeConfigValue(import.meta.env.VITE_FIREBASE_APP_ID as string | undefined) || '',
+  };
+}
+
 export function getStoredFirebaseConfig(): FirebaseCustomConfig | null {
   try {
     const raw = localStorage.getItem(FIREBASE_CONFIG_KEY);
-    if (!raw) return null;
+    if (!raw) return getEnvFirebaseConfig();
     const parsed = JSON.parse(raw);
     return {
       apiKey: sanitizeConfigValue(parsed.apiKey),
@@ -64,7 +78,7 @@ export function getStoredFirebaseConfig(): FirebaseCustomConfig | null {
       appId: sanitizeConfigValue(parsed.appId),
     };
   } catch {
-    return null;
+    return getEnvFirebaseConfig();
   }
 }
 

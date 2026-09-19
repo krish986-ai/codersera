@@ -40,7 +40,7 @@ export const TicketLookup: React.FC<TicketLookupProps> = ({ onSelectTicket, onGo
           Find Your Event Pass
         </h2>
         <p className="text-xs sm:text-sm text-slate-400 mt-1 max-w-md mx-auto leading-relaxed">
-          Already registered? Enter your email address, roll number / student ID, or unique ticket ID to retrieve your digital badge.
+          Already registered? Enter your email address, Attendee / Roll ID, or Pass ID to retrieve your digital badge.
         </p>
       </div>
 
@@ -53,7 +53,7 @@ export const TicketLookup: React.FC<TicketLookupProps> = ({ onSelectTicket, onGo
             required
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Enter Email (e.g. yourname@college.edu) or Roll / Student ID"
+            placeholder="Enter Email or Attendee / Roll ID"
             className="flex-1 bg-transparent px-4 py-2.5 text-sm text-white font-mono placeholder:text-slate-500 focus:outline-none"
           />
           <button
@@ -79,7 +79,7 @@ export const TicketLookup: React.FC<TicketLookupProps> = ({ onSelectTicket, onGo
               <AlertCircle className="w-8 h-8 text-amber-400 mx-auto" />
               <p className="text-sm font-semibold text-white">No active ticket pass found</p>
               <p className="text-xs text-slate-400 max-w-md mx-auto leading-relaxed">
-                We could not find an issued pass matching &quot;{query}&quot;. Please verify your student ID or email, or claim a new pass below.
+                We could not find an issued pass matching &quot;{query}&quot;. Please verify your Attendee / Roll ID or email, or claim a new pass below.
               </p>
               <button
                 onClick={onGoToEvents}
@@ -109,7 +109,7 @@ export const TicketLookup: React.FC<TicketLookupProps> = ({ onSelectTicket, onGo
                   </h4>
                   <div className="flex flex-wrap items-center gap-3 text-xs text-slate-400 font-mono mt-1">
                     <span>👤 {ticket.fullName}</span>
-                    <span>🎓 {ticket.rollNumber}</span>
+                    <span>🪪 {ticket.rollNumber}</span>
                     <span>{ticket.checkedIn ? '✅ Checked In' : '⏳ Pass Active'}</span>
                   </div>
                 </div>

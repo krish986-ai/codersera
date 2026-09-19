@@ -21,20 +21,20 @@ interface RegistrationFormProps {
 const BRANCHES: Branch[] = [
   'Full Stack & Web Development',
   'Artificial Intelligence & Machine Learning',
-  'Blockchain & Web3 Engineering',
   'Cloud Computing & DevOps',
   'Cybersecurity & Systems',
-  'Computer Science & Engineering (CSE)',
-  'Information Technology (IT)',
+  'Blockchain & Web3 Engineering',
+  'Mobile & App Engineering',
   'UI/UX & Product Design',
-  'Other Engineering / Tech',
+  'Computer Science & Engineering',
+  'Open Source & General Engineering',
 ];
 
 const YEARS: AcademicYear[] = [
-  '1st / 2nd Year Student',
-  '3rd / 4th Year Student',
-  'Master\'s / Postgraduate',
-  'Self-Taught / Professional',
+  'Student Developer (1st / 2nd Year)',
+  'Senior Student (3rd / 4th Year)',
+  'Postgraduate / Researcher',
+  'Working Professional / Builder',
 ];
 
 export const RegistrationForm: React.FC<RegistrationFormProps> = ({
@@ -51,7 +51,7 @@ export const RegistrationForm: React.FC<RegistrationFormProps> = ({
   const [rollNumber, setRollNumber] = useState('');
   const [collegeName, setCollegeName] = useState('');
   const [branch, setBranch] = useState<Branch>('Full Stack & Web Development');
-  const [year, setYear] = useState<AcademicYear>('3rd / 4th Year Student');
+  const [year, setYear] = useState<AcademicYear>('Student Developer (1st / 2nd Year)');
   const [phoneNumber, setPhoneNumber] = useState('');
   const [githubUrl, setGithubUrl] = useState('');
   const [linkedinUrl, setLinkedinUrl] = useState('');
@@ -323,7 +323,7 @@ export const RegistrationForm: React.FC<RegistrationFormProps> = ({
 
               <div>
                 <label className="block text-xs font-medium text-slate-300 mb-1.5">
-                  Student Roll No. / Attendee ID <span className="text-cyan-400">*</span>
+                  Attendee / Student ID or Roll No. <span className="text-cyan-400">*</span>
                 </label>
                 <input
                   id="reg-roll"
@@ -331,7 +331,7 @@ export const RegistrationForm: React.FC<RegistrationFormProps> = ({
                   required
                   value={rollNumber}
                   onChange={(e) => setRollNumber(e.target.value)}
-                  placeholder="e.g. 2201330100015 or DEV-88"
+                  placeholder="e.g. DEV-2026-088 or Roll No."
                   className="w-full px-4 py-2.5 rounded-xl bg-[#18181b] border border-[#27272a] text-white text-sm focus:border-cyan-400 focus:outline-none transition-all uppercase font-mono"
                 />
               </div>
@@ -341,14 +341,14 @@ export const RegistrationForm: React.FC<RegistrationFormProps> = ({
             <div>
               <label className="block text-xs font-medium text-slate-300 mb-1.5 flex items-center gap-1.5">
                 <Building2 className="w-3.5 h-3.5 text-cyan-400" />
-                <span>College / University / Organization (Optional)</span>
+                <span>Institution / University / Organization (Optional)</span>
               </label>
               <input
                 id="reg-college"
                 type="text"
                 value={collegeName}
                 onChange={(e) => setCollegeName(e.target.value)}
-                placeholder="e.g. NIET Greater Noida / Independent Developer"
+                placeholder="e.g. NIET Greater Noida / Independent Builder"
                 className="w-full px-4 py-2.5 rounded-xl bg-[#18181b] border border-[#27272a] text-white text-sm focus:border-cyan-400 focus:outline-none"
               />
             </div>
@@ -357,7 +357,7 @@ export const RegistrationForm: React.FC<RegistrationFormProps> = ({
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label className="block text-xs font-medium text-slate-300 mb-1.5">
-                  Primary Track / Specialization <span className="text-cyan-400">*</span>
+                  Developer Track / Focus Area <span className="text-cyan-400">*</span>
                 </label>
                 <select
                   id="reg-branch"

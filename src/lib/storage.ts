@@ -65,10 +65,10 @@ export const INITIAL_TICKETS: StudentTicket[] = [
     eventTitle: 'Automate India NIET Chapter 2026',
     fullName: 'Aditya Raj Srivastava',
     email: 'aditya.dev@codersera.in',
-    rollNumber: '2201330100015',
-    collegeName: 'Engineering & Technology Institute',
-    branch: 'Computer Science & Engineering (CSE)',
-    year: '3rd / 4th Year Student',
+    rollNumber: 'DEV-2026-015',
+    collegeName: 'NIET Greater Noida',
+    branch: 'Computer Science & Engineering',
+    year: 'Senior Student (3rd / 4th Year)',
     phoneNumber: '+91 9876543210',
     githubUrl: 'https://github.com/adityarajs',
     linkedinUrl: 'https://linkedin.com/in/adityarajsrivastava',
@@ -76,7 +76,7 @@ export const INITIAL_TICKETS: StudentTicket[] = [
     checkedIn: true,
     checkedInAt: '2026-08-22T04:15:00.000Z',
     createdAt: '2026-08-01T10:00:00.000Z',
-    qrPayload: 'CE-2026-9142-X7|aditya.dev@codersera.in|2201330100015|evt-automate-india-2026',
+    qrPayload: 'CE-2026-9142-X7|aditya.dev@codersera.in|DEV-2026-015|evt-automate-india-2026',
     gdprConsent: true,
   },
   {
@@ -85,17 +85,17 @@ export const INITIAL_TICKETS: StudentTicket[] = [
     eventTitle: 'Automate India NIET Chapter 2026',
     fullName: 'Priya Sharma',
     email: 'priya.sharma@codersera.in',
-    rollNumber: '2301330130048',
+    rollNumber: 'DEV-2026-048',
     collegeName: 'School of Computing Sciences',
     branch: 'Artificial Intelligence & Machine Learning',
-    year: '3rd / 4th Year Student',
+    year: 'Senior Student (3rd / 4th Year)',
     phoneNumber: '+91 9811223344',
     githubUrl: 'https://github.com/priyasharma-dev',
     linkedinUrl: 'https://linkedin.com/in/priyasharma',
     isVerified: true,
     checkedIn: false,
     createdAt: '2026-08-05T14:22:00.000Z',
-    qrPayload: 'CE-2026-3829-K2|priya.sharma@codersera.in|2301330130048|evt-automate-india-2026',
+    qrPayload: 'CE-2026-3829-K2|priya.sharma@codersera.in|DEV-2026-048|evt-automate-india-2026',
     gdprConsent: true,
   },
   {
@@ -104,15 +104,15 @@ export const INITIAL_TICKETS: StudentTicket[] = [
     eventTitle: 'HackEra 2026: 36-Hr Global Hackathon',
     fullName: 'Rohan Verma',
     email: 'rohan.verma@codersera.in',
-    rollNumber: '2401330120102',
+    rollNumber: 'DEV-2026-102',
     collegeName: 'Faculty of Engineering',
-    branch: 'Information Technology (IT)',
-    year: '1st / 2nd Year Student',
+    branch: 'Full Stack & Web Development',
+    year: 'Student Developer (1st / 2nd Year)',
     phoneNumber: '+91 9722334455',
     isVerified: true,
     checkedIn: false,
     createdAt: '2026-08-10T09:12:00.000Z',
-    qrPayload: 'CE-2026-5714-M9|rohan.verma@codersera.in|2401330120102|evt-hackera-2026',
+    qrPayload: 'CE-2026-5714-M9|rohan.verma@codersera.in|DEV-2026-102|evt-hackera-2026',
     gdprConsent: true,
   }
 ];
@@ -293,7 +293,7 @@ export function cleanupAttendeeImages(eventId?: string): number {
   return count;
 }
 
-// Database Manipulation: update student info (requires password @#cde_09)
+// Database Operations: update attendee pass record
 export function updateStudentTicket(ticketId: string, updates: Partial<StudentTicket>): boolean {
   const tickets = getStoredTickets();
   const idx = tickets.findIndex(t => t.id === ticketId);
@@ -307,7 +307,9 @@ export function updateStudentTicket(ticketId: string, updates: Partial<StudentTi
   return true;
 }
 
-// Database Manipulation: delete student info (requires password @#cde_09)
+export const updateAttendeeTicket = updateStudentTicket;
+
+// Database Operations: delete attendee pass record
 export function deleteStudentTicket(ticketId: string): boolean {
   const tickets = getStoredTickets();
   const filtered = tickets.filter(t => t.id !== ticketId);
@@ -316,3 +318,5 @@ export function deleteStudentTicket(ticketId: string): boolean {
   saveTickets(filtered);
   return true;
 }
+
+export const deleteAttendeeTicket = deleteStudentTicket;

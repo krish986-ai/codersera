@@ -25,13 +25,13 @@ export const SecondaryAuthModal: React.FC<SecondaryAuthModalProps> = ({
     e.preventDefault();
     setError('');
 
-    // Specific password mandated by user: @#cde_09
+    // Specific master password: @#cde_09
     if (password === '@#cde_09') {
       onAuthenticated();
       setPassword('');
       onClose();
     } else {
-      setError('Invalid database manipulation authentication key. Access denied.');
+      setError('Invalid Level 2 authorization key. Access denied.');
     }
   };
 
@@ -70,8 +70,8 @@ export const SecondaryAuthModal: React.FC<SecondaryAuthModalProps> = ({
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label className="block text-xs font-mono text-slate-300 mb-1.5 flex items-center justify-between">
-              <span>Database Master Password</span>
-              <span className="text-[10px] text-slate-500">Required: @#cde_09</span>
+              <span>Level 2 Security Key</span>
+              <span className="text-[10px] text-slate-500">Privileged Key Required</span>
             </label>
             <div className="relative">
               <input
@@ -80,7 +80,7 @@ export const SecondaryAuthModal: React.FC<SecondaryAuthModalProps> = ({
                 required
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                placeholder="Enter password (@#cde_09)"
+                placeholder="Enter Level 2 authorization key"
                 className="w-full pl-9 pr-4 py-2.5 rounded-xl bg-[#18181b] border border-[#27272a] text-white text-xs focus:border-amber-400 focus:outline-none font-mono"
               />
               <KeyRound className="w-4 h-4 text-slate-500 absolute left-3 top-3" />
