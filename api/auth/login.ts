@@ -1,5 +1,5 @@
 import { scryptSync, timingSafeEqual } from 'node:crypto';
-import { createSession, sessionCookie } from '../_auth';
+import { createSession, sessionCookie } from '../_auth.js';
 
 export default function handler(request: any, response: any) {
   if (request.method !== 'POST') {
