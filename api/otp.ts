@@ -34,8 +34,8 @@ async function sendOtpEmail(email: string, code: string, purpose: string) {
 export default async function handler(request: any, response: any) {
   const url = request.url || '';
   const path = new URL(url, `https://${request.headers.host}`).pathname;
-  const isSend = path === '/api/otp/send' || (path === '/api/otp' && request.body?.action === 'send');
-  const isVerify = path === '/api/otp/verify' || (path === '/api/otp' && request.body?.action === 'verify');
+  const isSend = path.endsWith('/otp/send') || path === '/api/otp/send';
+  const isVerify = path.endsWith('/otp/verify') || path === '/api/otp/verify';
   const db = firestore();
 
   if (isSend && request.method === 'POST') {
