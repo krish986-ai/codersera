@@ -303,7 +303,7 @@ export async function testFirestoreConnection(
             '⚠️ Rules currently reject unauthenticated read/writes ("PERMISSION_DENIED")',
           ],
           suggestedAction: 'To allow instant ticket synchronization, go to Firebase Console > Firestore Database > Rules tab, and update your rules to allow access.',
-          suggestedRules: `rules_version = '2';\nservice cloud.firestore {\n  match /databases/{database}/documents {\n    match /{document=**} {\n      allow read, write: if true;\n    }\n  }\n}`,
+          suggestedRules: `rules_version = '2';\nservice cloud.firestore {\n  match /databases/{database}/documents {\n    match /{document=**} {\n      allow read, write: if false;\n    }\n  }\n}`,
         };
       }
 
@@ -387,7 +387,7 @@ export async function testFirestoreConnection(
           '⚠️ Set Firestore security rules in Firebase Console to allow read & write.',
         ],
         suggestedAction: 'Go to Firebase Console > Firestore Database > Rules tab to update your rules.',
-        suggestedRules: `rules_version = '2';\nservice cloud.firestore {\n  match /databases/{database}/documents {\n    match /{document=**} {\n      allow read, write: if true;\n    }\n  }\n}`,
+        suggestedRules: `rules_version = '2';\nservice cloud.firestore {\n  match /databases/{database}/documents {\n    match /{document=**} {\n      allow read, write: if false;\n    }\n  }\n}`,
       };
     }
 

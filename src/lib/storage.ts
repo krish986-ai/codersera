@@ -117,6 +117,35 @@ export const INITIAL_TICKETS: StudentTicket[] = [
   }
 ];
 
+function isCommunityEvent(value: unknown): value is CommunityEvent {
+  if (!value || typeof value !== 'object') return false;
+  const event = value as Partial<CommunityEvent>;
+  return typeof event.id === 'string'
+    && typeof event.title === 'string'
+    && typeof event.date === 'string'
+    && typeof event.time === 'string'
+    && typeof event.venue === 'string'
+    && typeof event.totalSeats === 'number'
+    && typeof event.availableSeats === 'number'
+    && typeof event.isActive === 'boolean';
+}
+
+function isStudentTicket(value: unknown): value is StudentTicket {
+  if (!value || typeof value !== 'object') return false;
+  const ticket = value as Partial<StudentTicket>;
+  return typeof ticket.id === 'string'
+    && typeof ticket.eventId === 'string'
+    && typeof ticket.eventTitle === 'string'
+    && typeof ticket.fullName === 'string'
+    && typeof ticket.email === 'string'
+    && typeof ticket.rollNumber === 'string'
+    && typeof ticket.createdAt === 'string'
+    && typeof ticket.qrPayload === 'string'
+    && typeof ticket.checkedIn === 'boolean'
+    && typeof ticket.isVerified === 'boolean'
+    && typeof ticket.gdprConsent === 'boolean';
+}
+
 export function getStoredEvents(): CommunityEvent[] {
   try {
     const raw = localStorage.getItem(STORAGE_KEYS.EVENTS);
@@ -124,8 +153,8 @@ export function getStoredEvents(): CommunityEvent[] {
       localStorage.setItem(STORAGE_KEYS.EVENTS, JSON.stringify(INITIAL_EVENTS));
       return INITIAL_EVENTS;
     }
-    const parsed = JSON.parse(raw);
-    if (!Array.isArray(parsed) || parsed.length === 0) {
+    const parsed: unknown = JSON.parse(raw);
+    if (!Array.isArray(parsed) || parsed.length === 0 || !parsed.every(isCommunityEvent)) {
       localStorage.setItem(STORAGE_KEYS.EVENTS, JSON.stringify(INITIAL_EVENTS));
       return INITIAL_EVENTS;
     }
@@ -150,8 +179,8 @@ export function getStoredTickets(): StudentTicket[] {
       localStorage.setItem(STORAGE_KEYS.TICKETS, JSON.stringify(INITIAL_TICKETS));
       return INITIAL_TICKETS;
     }
-    const parsed = JSON.parse(raw);
-    if (!Array.isArray(parsed) || parsed.length === 0) {
+    const parsed: unknown = JSON.parse(raw);
+    if (!Array.isArray(parsed) || parsed.length === 0 || !parsed.every(isStudentTicket)) {
       localStorage.setItem(STORAGE_KEYS.TICKETS, JSON.stringify(INITIAL_TICKETS));
       return INITIAL_TICKETS;
     }
@@ -169,14 +198,19 @@ export function saveTickets(tickets: StudentTicket[]) {
   }
 }
 
-// Generate unique Ticket ID: CE-YEAR-RANDOM-SUFFIX
+function generateRandomIdPart(length: number): string {
+  if (typeof crypto !== 'undefined' && typeof crypto.getRandomValues === 'function') {
+    const bytes = new Uint8Array(length);
+    crypto.getRandomValues(bytes);
+    return Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0')).join('').slice(0, length).toUpperCase();
+  }
+  return `${Date.now().toString(36)}${performance.now().toString(36)}`.replace(/\W/g, '').slice(-length).toUpperCase();
+}
+
+// Generate unique Ticket ID: CE-YEAR-RANDOM
 export function generateUniqueTicketId(): string {
   const year = new Date().getFullYear();
-  const randNum = Math.floor(1000 + Math.random() * 9000);
-  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-  const suffix = chars.charAt(Math.floor(Math.random() * chars.length)) + 
-                 chars.charAt(Math.floor(Math.random() * chars.length));
-  return `CE-${year}-${randNum}-${suffix}`;
+  return `CE-${year}-${generateRandomIdPart(12)}`;
 }
 
 // Check if user already has a ticket for this event
@@ -205,7 +239,7 @@ export function findTicketsByEmail(email: string): StudentTicket[] {
 // EVENT MANAGEMENT (Admin Controls)
 export function addCommunityEvent(eventData: Omit<CommunityEvent, 'id'> & { id?: string }): CommunityEvent {
   const events = getStoredEvents();
-  const id = eventData.id || `evt-${Date.now().toString(36)}-${Math.random().toString(36).substring(2, 6)}`;
+  const id = eventData.id || `evt-${generateRandomIdPart(12).toLowerCase()}`;
   
   const newEvent: CommunityEvent = {
     ...eventData,

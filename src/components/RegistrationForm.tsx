@@ -196,7 +196,11 @@ export const RegistrationForm: React.FC<RegistrationFormProps> = ({
       saveTickets([newTicket, ...existingTickets]);
 
       // Non-blocking cloud synchronization if Firebase is connected
-      syncTicketToCloud(newTicket).catch(() => {});
+      syncTicketToCloud(newTicket).then((synced) => {
+        if (!synced) {
+          console.warn('Ticket was saved locally, but cloud synchronization was unavailable.');
+        }
+      });
 
       // Decrement available seat count in event
       const allEvents = getStoredEvents();
