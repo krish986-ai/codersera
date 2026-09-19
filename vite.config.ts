@@ -17,6 +17,9 @@ export default defineConfig(() => {
       allowedHosts: true as const,
       hmr: process.env.DISABLE_HMR !== 'true',
       watch: process.env.DISABLE_HMR === 'true' ? null : {},
+      proxy: {
+        '/api': 'http://localhost:3001',
+      },
     },
     preview: {
       host: '0.0.0.0',

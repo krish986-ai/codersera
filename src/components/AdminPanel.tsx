@@ -14,7 +14,6 @@ import {
   addCommunityEvent, updateCommunityEvent, deleteCommunityEvent, toggleEventStatus
 } from '../lib/storage';
 import { exportTicketsToCsv } from '../lib/exportExcel';
-import { SecondaryAuthModal } from './SecondaryAuthModal';
 import { 
   getStoredFirebaseConfig, 
   saveStoredFirebaseConfig, 
@@ -50,7 +49,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   onLogout,
   onViewTicket,
 }) => {
-  // Login State (First Lock password: @@cd_tic.1215)
+  // Login state is verified by the local server.
   const [passwordInput, setPasswordInput] = useState('');
   const [loginError, setLoginError] = useState('');
 
@@ -67,15 +66,6 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   const [branchFilter, setBranchFilter] = useState('all');
   const [yearFilter, setYearFilter] = useState('all');
   const [checkInFilter, setCheckInFilter] = useState<'all' | 'checkedIn' | 'pending'>('all');
-
-  // Secondary Auth State (Master password: @#cde_09)
-  const [secondaryAuthOpen, setSecondaryAuthOpen] = useState(false);
-  const [pendingAction, setPendingAction] = useState<{
-    type: 'edit' | 'delete' | 'cleanup' | 'delete_event';
-    ticketId?: string;
-    eventId?: string;
-    payload?: Partial<StudentTicket>;
-  } | null>(null);
 
   // Edit Student Modal state
   const [editingTicket, setEditingTicket] = useState<StudentTicket | null>(null);
@@ -126,16 +116,26 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     setTickets(getStoredTickets());
   };
 
-  // First Lock Authentication check: @@cd_tic.1215
-  const handleAdminLogin = (e: React.FormEvent) => {
+  const handleAdminLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoginError('');
 
-    if (passwordInput === '@@cd_tic.1215') {
+    try {
+      const response = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ password: passwordInput }),
+      });
+      if (!response.ok) {
+        const result = await response.json().catch(() => null) as { error?: string } | null;
+        setLoginError(result?.error || 'Unable to authenticate. Please try again.');
+        return;
+      }
       onLoginSuccess();
       setPasswordInput('');
-    } else {
-      setLoginError('Invalid Administrator Access Password. Access denied.');
+    } catch {
+      setLoginError('Authentication service is unavailable. Start the local server and try again.');
     }
   };
 
@@ -211,20 +211,17 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
 
   // Request Secondary Auth for image cleanup
   const requestImageCleanup = () => {
-    setPendingAction({ type: 'cleanup' });
-    setSecondaryAuthOpen(true);
+    executeAuthorizedAction({ type: 'cleanup' });
   };
 
   // Request Secondary Auth for student delete
   const requestDeleteStudent = (ticketId: string) => {
-    setPendingAction({ type: 'delete', ticketId });
-    setSecondaryAuthOpen(true);
+    executeAuthorizedAction({ type: 'delete', ticketId });
   };
 
   // Request Secondary Auth for event delete
   const requestDeleteEvent = (eventId: string) => {
-    setPendingAction({ type: 'delete_event', eventId });
-    setSecondaryAuthOpen(true);
+    executeAuthorizedAction({ type: 'delete_event', eventId });
   };
 
   // Request Secondary Auth for student edit
@@ -232,26 +229,27 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     setEditingTicket(ticket);
   };
 
-  // Executes after Secondary Auth password (@#cde_09) is approved
-  const executeAuthorizedAction = () => {
-    if (!pendingAction) return;
+  const executeAuthorizedAction = (action: {
+    type: 'delete' | 'cleanup' | 'delete_event';
+    ticketId?: string;
+    eventId?: string;
+  }) => {
 
-    if (pendingAction.type === 'cleanup') {
+    if (action.type === 'cleanup') {
       const count = cleanupAttendeeImages(selectedEventId === 'all' ? undefined : selectedEventId);
       refreshData();
       setCleanupMessage(`Successfully cleaned up ${count} attendee photos to save server storage.`);
       setTimeout(() => setCleanupMessage(''), 5000);
-    } else if (pendingAction.type === 'delete' && pendingAction.ticketId) {
-      deleteStudentTicket(pendingAction.ticketId);
+    } else if (action.type === 'delete' && action.ticketId) {
+      deleteStudentTicket(action.ticketId);
       refreshData();
-    } else if (pendingAction.type === 'delete_event' && pendingAction.eventId) {
-      deleteCommunityEvent(pendingAction.eventId);
+    } else if (action.type === 'delete_event' && action.eventId) {
+      deleteCommunityEvent(action.eventId);
       refreshData();
       setEventActionSuccess('Event removed successfully from database.');
       setTimeout(() => setEventActionSuccess(''), 4000);
     }
 
-    setPendingAction(null);
   };
 
   // Save student edit with secondary auth verification
@@ -580,7 +578,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
           </form>
 
           <div className="mt-4 flex items-center justify-center gap-1.5 text-[10px] text-slate-500 font-mono">
-            <span>Authorized access only • Default key: <code className="text-cyan-400">@@cd_tic.1215</code></span>
+            <span>Authorized access only • Credentials are configured on the local server.</span>
           </div>
         </div>
       </div>
@@ -1931,29 +1929,6 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
         </div>
       )}
 
-      {/* SECONDARY AUTHENTICATION MODAL */}
-      <SecondaryAuthModal
-        isOpen={secondaryAuthOpen}
-        actionTitle={
-          pendingAction?.type === 'delete_event'
-            ? 'Confirm Permanent Event Deletion'
-            : pendingAction?.type === 'cleanup'
-            ? 'Confirm Attendee Photo Purge'
-            : 'Confirm Destructive Database Action'
-        }
-        actionDescription={
-          pendingAction?.type === 'delete_event'
-            ? 'This will permanently remove the event from the database. Please enter your Level 2 authorization key to confirm.'
-            : pendingAction?.type === 'cleanup'
-            ? 'This action replaces base64 photos with placeholder badges to conserve server storage. Requires Level 2 authorization.'
-            : 'Please enter Level 2 administrator authorization key to confirm.'
-        }
-        onAuthenticated={executeAuthorizedAction}
-        onClose={() => {
-          setSecondaryAuthOpen(false);
-          setPendingAction(null);
-        }}
-      />
     </div>
   );
 };

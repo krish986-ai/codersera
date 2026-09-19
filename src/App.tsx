@@ -30,10 +30,16 @@ export default function App() {
     setEvents(getStoredEvents());
   }, [currentView]);
 
-  // Admin authentication state (password: @@cd_tic.1215)
-  const [adminAuthenticated, setAdminAuthenticated] = useState<boolean>(() => {
-    return sessionStorage.getItem('codersera_admin_auth') === 'true';
-  });
+  const [adminAuthenticated, setAdminAuthenticated] = useState(false);
+  const [authChecked, setAuthChecked] = useState(false);
+
+  useEffect(() => {
+    fetch('/api/auth/session', { credentials: 'include' })
+      .then((response) => response.ok ? response.json() : { authenticated: false })
+      .then((result: { authenticated?: boolean }) => setAdminAuthenticated(result.authenticated === true))
+      .catch(() => setAdminAuthenticated(false))
+      .finally(() => setAuthChecked(true));
+  }, []);
 
   // GDPR Modal state
   const [gdprModalOpen, setGdprModalOpen] = useState(false);
@@ -81,13 +87,12 @@ export default function App() {
   // Admin login handlers
   const handleAdminLoginSuccess = () => {
     setAdminAuthenticated(true);
-    sessionStorage.setItem('codersera_admin_auth', 'true');
     addToast('success', 'Admin Session Verified', 'Welcome to CodersEra Command Center.');
   };
 
-  const handleAdminLogout = () => {
+  const handleAdminLogout = async () => {
+    await fetch('/api/auth/logout', { method: 'POST', credentials: 'include' }).catch(() => undefined);
     setAdminAuthenticated(false);
-    sessionStorage.removeItem('codersera_admin_auth');
     setCurrentView('user-events');
     addToast('info', 'Console Locked', 'Admin session has been terminated safely.');
   };
@@ -106,6 +111,9 @@ export default function App() {
 
       {/* Main Content View Switcher */}
       <main className="flex-1 w-full pb-16">
+        {!authChecked && currentView === 'admin' && (
+          <div className="max-w-md mx-auto py-16 px-4 text-center text-sm text-slate-400">Checking secure session…</div>
+        )}
         {currentView === 'user-events' && (
           <EventList
             events={events}
@@ -141,7 +149,7 @@ export default function App() {
           />
         )}
 
-        {currentView === 'admin' && (
+        {currentView === 'admin' && authChecked && (
           <AdminPanel
             isAuthenticated={adminAuthenticated}
             onLoginSuccess={handleAdminLoginSuccess}
