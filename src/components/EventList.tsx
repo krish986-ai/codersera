@@ -177,7 +177,7 @@ export const EventList: React.FC<EventListProps> = ({ events, onSelectEvent, onG
                   Team Size: 2-3 Members
                 </span>
                 <span className="px-3 py-1 rounded-md text-[11px] font-mono text-slate-400 bg-[#18181b] border border-[#27272a]">
-                  {flagshipEvent.availableSeats} Seats Left
+                  {flagshipEvent.totalSeats - flagshipEvent.availableSeats} Passes Generated
                 </span>
               </div>
 
@@ -370,7 +370,7 @@ export const EventList: React.FC<EventListProps> = ({ events, onSelectEvent, onG
                       </span>
                       <div className="flex items-center gap-1.5 text-[11px] font-mono text-cyan-400">
                         <Users className="w-3.5 h-3.5" />
-                        <span>{event.availableSeats} / {event.totalSeats} seats</span>
+                        <span>{event.totalSeats - event.availableSeats} / {event.totalSeats} passes generated</span>
                       </div>
                     </div>
 
@@ -424,6 +424,10 @@ export const EventList: React.FC<EventListProps> = ({ events, onSelectEvent, onG
                         <span className="text-cyan-400 font-semibold">
                           {event.isActive ? 'Open' : 'Closed'}
                         </span>
+                      </div>
+                      <div className="flex justify-between text-[10px] font-mono">
+                        <span className="text-slate-500">Seats remaining</span>
+                        <span className="text-emerald-400 font-semibold">{event.availableSeats} of {event.totalSeats}</span>
                       </div>
                       <div className="w-full h-1.5 bg-[#09090b] rounded-full overflow-hidden border border-[#27272a]">
                         <div
