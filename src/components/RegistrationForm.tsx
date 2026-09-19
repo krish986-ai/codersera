@@ -12,7 +12,6 @@ import {
 import {
   completeRegistrationEmailLink,
   sendRegistrationEmailLink,
-  syncTicketToCloud,
 } from '../lib/firebaseConfig';
 
 interface RegistrationFormProps {
@@ -80,7 +79,7 @@ export const RegistrationForm: React.FC<RegistrationFormProps> = ({
     const pendingEmail = window.localStorage.getItem('codersera_pending_email');
     if (pendingEmail && pendingEmail === email.trim().toLowerCase() && window.location.search) {
       completeRegistrationEmailLink(pendingEmail)
-        .then((verified) => {
+        .then(async (verified) => {
           if (verified) setStep('details');
         })
         .catch(() => setVerificationError('This verification link is invalid or expired. Please request a new link.'));
@@ -121,7 +120,7 @@ export const RegistrationForm: React.FC<RegistrationFormProps> = ({
   };
 
   // Step 1: Validate details and check for duplicate before proceeding to verification
-  const handleProceedToVerification = (e: React.FormEvent) => {
+  const handleProceedToVerification = async (e: React.FormEvent) => {
     e.preventDefault();
     setGeneralError('');
     setDuplicateTicketFound(null);
@@ -143,7 +142,7 @@ export const RegistrationForm: React.FC<RegistrationFormProps> = ({
     }
 
     // Single Allocation Check: One ticket per user rule
-    const existing = findExistingTicket(email, rollNumber, selectedEvent.id);
+    const existing = await findExistingTicket(email, rollNumber, selectedEvent.id);
     if (existing) {
       setDuplicateTicketFound(existing);
       setGeneralError(`A ticket has already been issued for ${email} / ID: ${rollNumber} for this event. Multiple tickets per attendee are not allowed.`);
@@ -161,21 +160,21 @@ export const RegistrationForm: React.FC<RegistrationFormProps> = ({
   };
 
   // Step 2: Confirm email link & issue unique ticket
-  const handleConfirmVerification = (e: React.FormEvent) => {
+  const handleConfirmVerification = async (e: React.FormEvent) => {
     e.preventDefault();
     setVerificationError('');
 
     setIsVerifying(true);
     const pendingEmail = window.localStorage.getItem('codersera_pending_email') || email.trim().toLowerCase();
     completeRegistrationEmailLink(pendingEmail)
-      .then((verified) => {
+      .then(async (verified) => {
         if (!verified) {
           setVerificationError('Open the verification link sent to your inbox before continuing.');
           setIsVerifying(false);
           return;
         }
       // Re-verify duplicate constraint atomically
-      const existing = findExistingTicket(email, rollNumber, selectedEvent.id);
+      const existing = await findExistingTicket(email, rollNumber, selectedEvent.id);
       if (existing) {
         setIsVerifying(false);
         setDuplicateTicketFound(existing);
@@ -208,22 +207,14 @@ export const RegistrationForm: React.FC<RegistrationFormProps> = ({
         gdprConsent: true,
       };
 
-      const existingTickets = getStoredTickets();
-      saveTickets([newTicket, ...existingTickets]);
-
-      // Non-blocking cloud synchronization if Firebase is connected
-      syncTicketToCloud(newTicket).then((synced) => {
-        if (!synced) {
-          console.warn('Ticket was saved locally, but cloud synchronization was unavailable.');
-        }
-      });
+      await saveTickets([newTicket]);
 
       // Decrement available seat count in event
-      const allEvents = getStoredEvents();
+      const allEvents = await getStoredEvents();
       const eventIdx = allEvents.findIndex(ev => ev.id === selectedEvent.id);
       if (eventIdx !== -1 && allEvents[eventIdx].availableSeats > 0) {
         allEvents[eventIdx].availableSeats -= 1;
-        saveEvents(allEvents);
+        await saveEvents([allEvents[eventIdx]]);
       }
 
       setIsVerifying(false);

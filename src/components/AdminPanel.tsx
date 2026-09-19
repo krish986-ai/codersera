@@ -47,8 +47,9 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   const [activeTab, setActiveTab] = useState<'attendees' | 'events' | 'scanner'>('events');
 
   // Data states
-  const [events, setEvents] = useState<CommunityEvent[]>(() => getStoredEvents());
-  const [tickets, setTickets] = useState<StudentTicket[]>(() => getStoredTickets());
+  const [events, setEvents] = useState<CommunityEvent[]>([]);
+  const [tickets, setTickets] = useState<StudentTicket[]>([]);
+  const [dataError, setDataError] = useState('');
 
   // Filters
   const [selectedEventId, setSelectedEventId] = useState<string>('all');
@@ -97,19 +98,17 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   const [eventActionSuccess, setEventActionSuccess] = useState('');
 
   // Refresh local data
-  const refreshData = () => {
-    setEvents(getStoredEvents());
-    setTickets(getStoredTickets());
+  const refreshData = async () => {
+    try {
+      const [nextEvents, nextTickets] = await Promise.all([getStoredEvents(), getStoredTickets()]);
+      setEvents(nextEvents); setTickets(nextTickets); setDataError('');
+    } catch (error: unknown) {
+      setDataError(error instanceof Error ? error.message : 'Unable to load admin data.');
+    }
   };
 
   useEffect(() => {
-    const handleStorageChange = (event: StorageEvent) => {
-      if (event.key === null || event.key.includes('ticket') || event.key.includes('event')) {
-        refreshData();
-      }
-    };
-    window.addEventListener('storage', handleStorageChange);
-    return () => window.removeEventListener('storage', handleStorageChange);
+    refreshData();
   }, []);
 
   const handleAdminLogin = async (e: React.FormEvent) => {
@@ -177,13 +176,13 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   };
 
   // Toggle CheckIn
-  const handleCheckInToggle = (ticketId: string) => {
-    toggleTicketCheckIn(ticketId);
-    refreshData();
+  const handleCheckInToggle = async (ticketId: string) => {
+    await toggleTicketCheckIn(ticketId);
+    await refreshData();
   };
 
   // Trigger Scanner Verification
-  const verifyScannedCode = (value: string) => {
+  const verifyScannedCode = async (value: string) => {
     const raw = value.trim();
     if (!raw) return;
     const ticketId = raw.includes('|') ? raw.split('|')[0] : raw;
@@ -202,7 +201,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     if (found.checkedIn) {
       setScanResult({ status: 'already-checked', ticket: found });
     } else {
-      const checkInResult = toggleTicketCheckIn(found.id);
+      const checkInResult = await toggleTicketCheckIn(found.id);
       if (!checkInResult.success || !checkInResult.ticket) {
         setScanResult({ status: 'not-found' });
         return;
@@ -333,23 +332,23 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     setEditingTicket(ticket);
   };
 
-  const executeAuthorizedAction = (action: {
+  const executeAuthorizedAction = async (action: {
     type: 'delete' | 'cleanup' | 'delete_event';
     ticketId?: string;
     eventId?: string;
   }) => {
 
     if (action.type === 'cleanup') {
-      const count = cleanupAttendeeImages(selectedEventId === 'all' ? undefined : selectedEventId);
-      refreshData();
+      const count = await cleanupAttendeeImages(selectedEventId === 'all' ? undefined : selectedEventId);
+      await refreshData();
       setCleanupMessage(`Successfully cleaned up ${count} attendee photos to save server storage.`);
       setTimeout(() => setCleanupMessage(''), 5000);
     } else if (action.type === 'delete' && action.ticketId) {
-      deleteStudentTicket(action.ticketId);
-      refreshData();
+      await deleteStudentTicket(action.ticketId);
+      await refreshData();
     } else if (action.type === 'delete_event' && action.eventId) {
-      deleteCommunityEvent(action.eventId);
-      refreshData();
+      await deleteCommunityEvent(action.eventId);
+      await refreshData();
       setEventActionSuccess('Event removed successfully from database.');
       setTimeout(() => setEventActionSuccess(''), 4000);
     }
@@ -357,12 +356,12 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   };
 
   // Save student edit with secondary auth verification
-  const handleSaveStudentEdit = (e: React.FormEvent) => {
+  const handleSaveStudentEdit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingTicket) return;
 
-    updateStudentTicket(editingTicket.id, editingTicket);
-    refreshData();
+    await updateStudentTicket(editingTicket.id, editingTicket);
+    await refreshData();
     setEditingTicket(null);
   };
 
@@ -407,7 +406,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   };
 
   // Save Event (Create or Update)
-  const handleSaveEvent = (e: React.FormEvent) => {
+  const handleSaveEvent = async (e: React.FormEvent) => {
     e.preventDefault();
     setEventFormError('');
 
@@ -423,7 +422,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
 
     if (editingEventId) {
       // Update existing
-      updateCommunityEvent(editingEventId, {
+      await updateCommunityEvent(editingEventId, {
         title: eventFormData.title.trim(),
         tagline: eventFormData.tagline.trim(),
         category: eventFormData.category,
@@ -439,7 +438,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
       setEventActionSuccess(`Event "${eventFormData.title}" updated successfully.`);
     } else {
       // Add new
-      addCommunityEvent({
+      await addCommunityEvent({
         title: eventFormData.title.trim(),
         tagline: eventFormData.tagline.trim(),
         category: eventFormData.category,
@@ -455,15 +454,15 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
       setEventActionSuccess(`New event "${eventFormData.title}" created successfully.`);
     }
 
-    refreshData();
+    await refreshData();
     setEventModalOpen(false);
     setTimeout(() => setEventActionSuccess(''), 4000);
   };
 
   // Quick Toggle Event Active Status
-  const handleToggleEventStatus = (eventId: string) => {
-    toggleEventStatus(eventId);
-    refreshData();
+  const handleToggleEventStatus = async (eventId: string) => {
+    await toggleEventStatus(eventId);
+    await refreshData();
   };
 
   // IF NOT AUTHENTICATED: Show password lock screen
@@ -524,6 +523,12 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   // AUTHENTICATED ADMIN DASHBOARD
   return (
     <div className="max-w-7xl mx-auto py-6 px-4 space-y-6">
+      {dataError && (
+        <div className="rounded-xl border border-red-500/30 bg-red-950/30 px-4 py-3 text-sm text-red-200">
+          {dataError}
+          <button type="button" onClick={refreshData} className="ml-3 underline">Retry</button>
+        </div>
+      )}
       {/* Top Banner & Quick Controls */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-5 rounded-2xl bg-[#121215] border border-[#27272a]">
         <div className="flex items-center gap-3">

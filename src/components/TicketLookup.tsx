@@ -12,22 +12,22 @@ export const TicketLookup: React.FC<TicketLookupProps> = ({ onSelectTicket, onGo
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<StudentTicket[] | null>(null);
   const [hasSearched, setHasSearched] = useState(false);
+  const [isSearching, setIsSearching] = useState(false);
+  const [searchError, setSearchError] = useState('');
 
-  const handleSearch = (e: React.FormEvent) => {
+  const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!query.trim()) return;
 
-    const allTickets = getStoredTickets();
-    const clean = query.trim().toLowerCase();
-
-    const matched = allTickets.filter(t => 
-      t.email.toLowerCase() === clean ||
-      t.rollNumber.toLowerCase() === clean ||
-      t.id.toLowerCase() === clean
-    );
-
-    setResults(matched);
-    setHasSearched(true);
+    setIsSearching(true); setSearchError('');
+    try {
+      const allTickets = await getStoredTickets();
+      const clean = query.trim().toLowerCase();
+      setResults(allTickets.filter(t => t.email.toLowerCase() === clean || t.rollNumber.toLowerCase() === clean || t.id.toLowerCase() === clean));
+      setHasSearched(true);
+    } catch (error: unknown) {
+      setSearchError(error instanceof Error ? error.message : 'Unable to search tickets.');
+    } finally { setIsSearching(false); }
   };
 
   return (
@@ -61,11 +61,12 @@ export const TicketLookup: React.FC<TicketLookupProps> = ({ onSelectTicket, onGo
             type="submit"
             className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-[#09090b] font-bold text-xs font-mono transition-all shrink-0"
           >
-            <span>Search</span>
+            <span>{isSearching ? 'Searching…' : 'Search'}</span>
             <ArrowRight className="w-3.5 h-3.5" />
           </button>
         </div>
       </form>
+      {searchError && <p className="mb-4 text-center text-sm text-red-300">{searchError}</p>}
 
       {/* Results */}
       {hasSearched && results && (

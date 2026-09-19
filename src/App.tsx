@@ -10,7 +10,7 @@ import { CommunityModal } from './components/CommunityModal';
 import { InfoSectionModal, InfoModalType } from './components/InfoSectionModal';
 import { NotificationToast, ToastMessage } from './components/NotificationToast';
 import { CommunityEvent, StudentTicket } from './types';
-import { getStoredEvents, getStoredTickets } from './lib/storage';
+import { getStoredEvents } from './lib/storage';
 import { ShieldCheck, Heart, Github, ExternalLink, Sparkles, ArrowLeft } from 'lucide-react';
 import { CodersEraLogo } from './components/CodersEraLogo';
 
@@ -21,7 +21,8 @@ export default function App() {
     return view || 'user-events';
   });
   
-  const [events, setEvents] = useState<CommunityEvent[]>(() => getStoredEvents());
+  const [events, setEvents] = useState<CommunityEvent[]>([]);
+  const [eventsError, setEventsError] = useState('');
   const [selectedEvent, setSelectedEvent] = useState<CommunityEvent | null>(() => events[0] || null);
   const [activeTicket, setActiveTicket] = useState<StudentTicket | null>(null);
 
@@ -50,7 +51,9 @@ export default function App() {
 
   // Sync events whenever view changes
   useEffect(() => {
-    setEvents(getStoredEvents());
+    getStoredEvents().then(setEvents).catch((error: unknown) => {
+      setEventsError(error instanceof Error ? error.message : 'Unable to load events.');
+    });
   }, [currentView]);
 
   const [adminAuthenticated, setAdminAuthenticated] = useState(false);
@@ -151,11 +154,8 @@ export default function App() {
           <div className="max-w-md mx-auto py-16 px-4 text-center text-sm text-slate-400">Checking secure session…</div>
         )}
         {currentView === 'user-events' && (
-          <EventList
-            events={events}
-            onSelectEvent={handleSelectEvent}
-            onGoToLookup={() => navigateTo('user-lookup')}
-          />
+          eventsError ? <div className="max-w-md mx-auto py-16 px-4 text-center text-sm text-red-300">{eventsError}</div> :
+          <EventList events={events} onSelectEvent={handleSelectEvent} onGoToLookup={() => navigateTo('user-lookup')} />
         )}
 
         {currentView === 'user-register' && selectedEvent && (

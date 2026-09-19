@@ -38,7 +38,9 @@ export interface FirebaseTestResult {
   suggestedRules?: string;
 }
 
-const FIREBASE_CONFIG_KEY = 'codersera_firebase_custom_config';
+// Configuration is supplied by the build environment. A custom value entered in
+// the diagnostics panel is kept only for this page session and never persisted.
+let runtimeConfig: FirebaseCustomConfig | null = null;
 
 // Clean and sanitize string (removes surrounding quotes, trailing commas, and whitespace)
 export function sanitizeConfigValue(val: string | undefined): string {
@@ -65,21 +67,7 @@ export function getEnvFirebaseConfig(): FirebaseCustomConfig | null {
 }
 
 export function getStoredFirebaseConfig(): FirebaseCustomConfig | null {
-  try {
-    const raw = localStorage.getItem(FIREBASE_CONFIG_KEY);
-    if (!raw) return getEnvFirebaseConfig();
-    const parsed = JSON.parse(raw);
-    return {
-      apiKey: sanitizeConfigValue(parsed.apiKey),
-      authDomain: sanitizeConfigValue(parsed.authDomain),
-      projectId: sanitizeConfigValue(parsed.projectId),
-      storageBucket: sanitizeConfigValue(parsed.storageBucket),
-      messagingSenderId: sanitizeConfigValue(parsed.messagingSenderId),
-      appId: sanitizeConfigValue(parsed.appId),
-    };
-  } catch {
-    return getEnvFirebaseConfig();
-  }
+  return runtimeConfig || getEnvFirebaseConfig();
 }
 
 export function saveStoredFirebaseConfig(cfg: FirebaseCustomConfig) {
@@ -92,8 +80,7 @@ export function saveStoredFirebaseConfig(cfg: FirebaseCustomConfig) {
       messagingSenderId: sanitizeConfigValue(cfg.messagingSenderId) || '1234567890',
       appId: sanitizeConfigValue(cfg.appId),
     };
-    localStorage.setItem(FIREBASE_CONFIG_KEY, JSON.stringify(cleanCfg));
-    
+    runtimeConfig = cleanCfg;
     // Reset runtime instances so new credentials take effect immediately
     resetFirebaseApp();
   } catch (e) {
@@ -103,7 +90,7 @@ export function saveStoredFirebaseConfig(cfg: FirebaseCustomConfig) {
 
 export async function clearStoredFirebaseConfig() {
   try {
-    localStorage.removeItem(FIREBASE_CONFIG_KEY);
+    runtimeConfig = null;
     await resetFirebaseApp();
   } catch (e) {
     console.error('Failed to clear Firebase config:', e);
