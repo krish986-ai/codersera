@@ -1,7 +1,9 @@
 import { scryptSync, timingSafeEqual } from 'node:crypto';
 import { createSession, sessionCookie } from '../_auth.js';
+import { noStore } from '../_http.js';
 
 export default function handler(request: any, response: any) {
+  noStore(response);
   if (request.method !== 'POST') {
     response.status(405).json({ error: 'Method not allowed.' });
     return;

@@ -6,8 +6,21 @@ export const INITIAL_EVENTS: CommunityEvent[] = [
   { id: 'evt-devforge-bootcamp', title: 'DevForge: Cloud-Native & DevOps Masterclass', tagline: 'Master Containers, Kubernetes, CI/CD Pipelines & Site Reliability', date: 'November 05, 2026', time: '01:00 PM - 06:00 PM IST', venue: 'Advanced Tech Seminar Hall & Virtual Live Stream', category: 'Bootcamp', description: 'Intensive engineering masterclass on containerization and production observability.', totalSeats: 150, availableSeats: 44, isActive: true, bannerGradient: 'from-sky-500/20 via-cyan-600/20 to-blue-700/10', tags: ['Docker', 'Kubernetes', 'CI/CD', 'Observability'], speakers: ['DevOps Lead @ CloudCorp'] },
 ];
 const request = async (url: string, init?: RequestInit) => {
-  const response = await fetch(url, { credentials: 'include', ...init, headers: { 'Content-Type': 'application/json', ...(init?.headers || {}) } });
-  if (!response.ok) throw new Error((await response.json().catch(() => null))?.error || 'Request failed.');
+  let response: Response;
+  try {
+    response = await fetch(url, {
+      credentials: 'include',
+      cache: 'no-store',
+      ...init,
+      headers: { 'Content-Type': 'application/json', ...(init?.headers || {}) },
+    });
+  } catch {
+    throw new Error(`Unable to reach ${url}. Check your connection and try again.`);
+  }
+  if (!response.ok) {
+    const body = await response.json().catch(() => null) as { error?: string } | null;
+    throw new Error(body?.error || `Request failed (${response.status}) for ${url}.`);
+  }
   return response.status === 204 ? null : response.json();
 };
 const json = (body: unknown) => ({ method: 'POST', body: JSON.stringify(body) });
