@@ -38,8 +38,20 @@ export default async function handler(request: any, response: any) {
   const isVerify = path.endsWith('/otp/verify') || path === '/api/otp/verify';
   const db = firestore();
 
-  if (isSend && request.method === 'POST') {
-    const { email, purpose = 'registration' } = jsonBody(request);
+  if (!isSend && !isVerify) {
+    console.log('OTP handler: path not matched', path);
+    return methodNotAllowed(response, ['POST']);
+  }
+
+  if (request.method !== 'POST') {
+    return methodNotAllowed(response, ['POST']);
+  }
+
+  const body = jsonBody(request);
+  console.log('OTP handler: request body', body);
+
+  if (isSend) {
+    const { email, purpose = 'registration' } = body;
     if (!email || typeof email !== 'string') {
       return response.status(400).json({ error: 'Email is required.' });
     }
@@ -57,8 +69,8 @@ export default async function handler(request: any, response: any) {
     }
   }
 
-  if (isVerify && request.method === 'POST') {
-    const { email, code } = jsonBody(request);
+  if (isVerify) {
+    const { email, code } = body;
     if (!email || !code) {
       return response.status(400).json({ error: 'Email and code are required.' });
     }

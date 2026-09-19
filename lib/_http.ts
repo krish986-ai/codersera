@@ -1,6 +1,9 @@
 export function jsonBody(request: any) {
   if (typeof request.body === 'object' && request.body) return request.body;
-  try { return JSON.parse(request.body || '{}'); } catch { return {}; }
+  if (typeof request.body === 'string') {
+    try { return JSON.parse(request.body); } catch { return {}; }
+  }
+  return {};
 }
 
 export function noStore(response: any) {
