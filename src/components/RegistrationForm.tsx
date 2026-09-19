@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { 
   Upload, CheckCircle, AlertCircle, Shield, ArrowRight, User, 
   Mail, Phone, BookOpen, GraduationCap, Github, Linkedin, 
@@ -8,10 +8,6 @@ import { CommunityEvent, StudentTicket, Branch, AcademicYear } from '../types';
 import { 
   findExistingTicket, generateUniqueTicketId, saveTickets
 } from '../lib/storage';
-import {
-  completeRegistrationEmailLink,
-  sendRegistrationEmailLink,
-} from '../lib/firebaseConfig';
 
 interface RegistrationFormProps {
   selectedEvent: CommunityEvent;
@@ -46,8 +42,8 @@ export const RegistrationForm: React.FC<RegistrationFormProps> = ({
   onCancel,
 }) => {
   const registrationDraftKey = `codersera_registration_draft_${selectedEvent.id}`;
-  // Form step: 'details' -> 'verify-email' -> 'completed'
-  const [step, setStep] = useState<'details' | 'verify-email'>('details');
+  // Form step: 'details' -> 'verify-otp' -> 'completed'
+  const [step, setStep] = useState<'details' | 'verify-otp'>('details');
 
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
@@ -65,17 +61,19 @@ export const RegistrationForm: React.FC<RegistrationFormProps> = ({
   const [photoError, setPhotoError] = useState<string>('');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Email-link verification state
+  // OTP verification state
+  const [otpCode, setOtpCode] = useState('');
   const [verificationSent, setVerificationSent] = useState(false);
   const [verificationError, setVerificationError] = useState('');
   const [isVerifying, setIsVerifying] = useState(false);
+  const [isSendingOtp, setIsSendingOtp] = useState(false);
 
   // GDPR consent
   const [gdprConsent, setGdprConsent] = useState(false);
   const [generalError, setGeneralError] = useState<string>('');
   const [duplicateTicketFound, setDuplicateTicketFound] = useState<StudentTicket | null>(null);
 
-  React.useEffect(() => {
+  useEffect(() => {
     const savedDraft = window.sessionStorage.getItem(registrationDraftKey);
     if (savedDraft) {
       try {
@@ -109,21 +107,6 @@ export const RegistrationForm: React.FC<RegistrationFormProps> = ({
         window.sessionStorage.removeItem(registrationDraftKey);
       }
     }
-
-    const pendingEmail = window.sessionStorage.getItem('codersera_pending_email')
-      || window.localStorage.getItem('codersera_pending_email');
-    if (!pendingEmail || !window.location.search) return;
-
-    completeRegistrationEmailLink(pendingEmail)
-      .then((verified) => {
-        if (verified) {
-          setEmail(pendingEmail);
-          setVerificationSent(false);
-          setStep('details');
-          setVerificationError('');
-        }
-      })
-      .catch(() => setVerificationError('This verification link is invalid or expired. Please request a new link.'));
   }, [registrationDraftKey]);
 
   // Handle Photo Upload with strictly <= 1.00 MB validation
@@ -159,7 +142,7 @@ export const RegistrationForm: React.FC<RegistrationFormProps> = ({
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
-  // Step 1: Validate details and check for duplicate before proceeding to verification
+  // Step 1: Validate details and check for duplicate before proceeding to OTP verification
   const handleProceedToVerification = async (e: React.FormEvent) => {
     e.preventDefault();
     setGeneralError('');
@@ -195,39 +178,59 @@ export const RegistrationForm: React.FC<RegistrationFormProps> = ({
     }));
     window.sessionStorage.setItem('codersera_pending_email', email.trim().toLowerCase());
 
-    sendRegistrationEmailLink(email.trim().toLowerCase())
-      .then(() => {
-        setVerificationSent(true);
-        setStep('verify-email');
-      })
-      .catch((error: unknown) => {
-        setGeneralError(error instanceof Error ? error.message : 'Unable to send the verification email.');
+    // Send OTP via local server
+    setIsSendingOtp(true);
+    try {
+      const response = await fetch('/api/otp/send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: email.trim().toLowerCase(), purpose: 'registration' }),
+        credentials: 'include',
       });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || 'Failed to send OTP');
+      setVerificationSent(true);
+      setStep('verify-otp');
+      setVerificationError('');
+    } catch (error: unknown) {
+      setGeneralError(error instanceof Error ? error.message : 'Unable to send OTP. Check server configuration.');
+    } finally {
+      setIsSendingOtp(false);
+    }
   };
 
-  // Step 2: Confirm email link & issue unique ticket
+  // Step 2: Verify OTP & issue unique ticket
   const handleConfirmVerification = async (e: React.FormEvent) => {
     e.preventDefault();
     setVerificationError('');
+
+    if (!otpCode || otpCode.length !== 6) {
+      setVerificationError('Please enter the 6-digit code sent to your email.');
+      return;
+    }
 
     setIsVerifying(true);
     const pendingEmail = window.sessionStorage.getItem('codersera_pending_email')
       || window.localStorage.getItem('codersera_pending_email')
       || email.trim().toLowerCase();
-    completeRegistrationEmailLink(pendingEmail)
-      .then(async (verified) => {
-        if (!verified) {
-          setVerificationError('Open the verification link sent to your inbox before continuing.');
-          setIsVerifying(false);
-          return;
-        }
+
+    try {
+      const response = await fetch('/api/otp/verify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: pendingEmail, code: otpCode }),
+        credentials: 'include',
+      });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || 'Invalid code');
+
       // Re-verify duplicate constraint atomically
       const existing = await findExistingTicket(email, rollNumber, selectedEvent.id);
       if (existing) {
         setIsVerifying(false);
         setDuplicateTicketFound(existing);
         setVerificationError('A ticket was already generated for this user.');
-          return;
+        return;
       }
 
       // Generate Unique Ticket Number (e.g. CE-2026-4821-X9)
@@ -259,11 +262,10 @@ export const RegistrationForm: React.FC<RegistrationFormProps> = ({
 
       setIsVerifying(false);
       onTicketGenerated(createdTicket || newTicket);
-      })
-      .catch(() => {
-        setIsVerifying(false);
-        setVerificationError('This verification link is invalid or expired. Please request a new link.');
-      });
+    } catch (error: unknown) {
+      setIsVerifying(false);
+      setVerificationError(error instanceof Error ? error.message : 'This verification code is invalid or expired. Please request a new one.');
+    }
   };
 
   return (
@@ -339,7 +341,7 @@ export const RegistrationForm: React.FC<RegistrationFormProps> = ({
                 <span className="text-xs text-slate-400">Official digital pass issuance</span>
               </div>
               <span className="text-xs font-mono text-cyan-400 bg-cyan-950/80 px-2.5 py-1 rounded border border-cyan-500/30">
-                Step 1 of 2
+                Step 1 of 2: Details
               </span>
             </div>
 
@@ -603,8 +605,8 @@ export const RegistrationForm: React.FC<RegistrationFormProps> = ({
         </form>
       )}
 
-      {/* STEP 2: Email Verification Link */}
-      {step === 'verify-email' && (
+      {/* STEP 2: OTP Verification */}
+      {step === 'verify-otp' && (
         <div className="bg-[#121215] border border-[#27272a] rounded-2xl p-6 sm:p-8">
           <div className="text-center max-w-md mx-auto">
             <div className="w-12 h-12 rounded-2xl bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-center text-cyan-400 mx-auto mb-4 shadow-[0_0_15px_rgba(56,189,248,0.15)]">
@@ -613,15 +615,15 @@ export const RegistrationForm: React.FC<RegistrationFormProps> = ({
 
             <h3 className="text-xl font-bold text-white font-display">Check Your Email</h3>
             <p className="text-xs text-slate-400 mt-2">
-              We sent a secure verification link to <strong className="text-cyan-300 font-mono">{email}</strong>.
+              We sent a 6-digit verification code to <strong className="text-cyan-300 font-mono">{email}</strong>.
             </p>
 
             <div className="my-5 p-4 rounded-xl bg-[#18181b] border border-dashed border-cyan-500/40">
               <span className="text-[10px] uppercase font-mono text-slate-400 block mb-1">
-                Verification link sent
+                OTP sent to your inbox
               </span>
               <span className="text-[10px] text-slate-500 font-mono block mt-1">
-                Open the link in your inbox, then return here to issue your badge.
+                Enter the 6-digit code below to verify your email.
               </span>
             </div>
 
@@ -632,10 +634,40 @@ export const RegistrationForm: React.FC<RegistrationFormProps> = ({
             )}
 
             <form onSubmit={handleConfirmVerification} className="space-y-4">
+              <div className="flex justify-center gap-2 mb-4">
+                {[...Array(6)].map((_, i) => (
+                  <input
+                    key={i}
+                    type="text"
+                    maxLength={1}
+                    value={otpCode[i] || ''}
+                    onChange={(e) => {
+                      const val = e.target.value.replace(/\D/g, '');
+                      const newCode = otpCode.substring(0, i) + val + otpCode.substring(i + 1);
+                      setOtpCode(newCode);
+                      if (val && i < 5) {
+                        const nextInput = document.querySelectorAll('[data-otp-input]')[i + 1] as HTMLInputElement;
+                        nextInput?.focus();
+                      }
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Backspace' && !otpCode[i] && i > 0) {
+                        const prevInput = document.querySelectorAll('[data-otp-input]')[i - 1] as HTMLInputElement;
+                        prevInput?.focus();
+                      }
+                    }}
+                    data-otp-input
+                    className="w-10 h-12 text-center text-xl font-mono bg-[#18181b] border border-[#27272a] rounded-xl text-white focus:border-cyan-400 focus:outline-none transition-all"
+                    autoComplete="one-time-code"
+                    inputMode="numeric"
+                  />
+                ))}
+              </div>
+
               <div className="flex items-center gap-3">
                 <button
                   type="button"
-                  onClick={() => setStep('details')}
+                  onClick={() => { setStep('details'); setOtpCode(''); }}
                   className="flex-1 py-2.5 rounded-xl border border-[#27272a] text-slate-400 hover:text-white text-xs font-mono"
                 >
                   Back
@@ -644,7 +676,7 @@ export const RegistrationForm: React.FC<RegistrationFormProps> = ({
                 <button
                   id="confirm-ticket-generation-btn"
                   type="submit"
-                  disabled={isVerifying || !verificationSent}
+                  disabled={isVerifying || otpCode.length !== 6}
                   className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl bg-cyan-500 hover:bg-cyan-400 disabled:opacity-50 text-slate-950 font-bold text-xs shadow-[0_0_20px_rgba(56,189,248,0.25)] transition-all font-mono"
                 >
                   {isVerifying ? (
@@ -655,11 +687,39 @@ export const RegistrationForm: React.FC<RegistrationFormProps> = ({
                   ) : (
                     <>
                       <Sparkles className="w-3.5 h-3.5" />
-                      <span>Issue My Event Pass</span>
+                      <span>Verify & Issue Pass</span>
                     </>
                   )}
                 </button>
               </div>
+
+              <button
+                type="button"
+                onClick={async () => {
+                  setIsSendingOtp(true);
+                  try {
+                    const response = await fetch('/api/otp/send', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ email: email.trim().toLowerCase(), purpose: 'registration' }),
+                      credentials: 'include',
+                    });
+                    const result = await response.json();
+                    if (!response.ok) throw new Error(result.error || 'Failed to resend OTP');
+                    setOtpCode('');
+                    setVerificationError('');
+                    setVerificationSent(true);
+                  } catch (error: unknown) {
+                    setVerificationError(error instanceof Error ? error.message : 'Unable to resend OTP.');
+                  } finally {
+                    setIsSendingOtp(false);
+                  }
+                }}
+                disabled={isSendingOtp}
+                className="w-full py-2 rounded-xl text-slate-400 hover:text-cyan-400 text-xs font-mono disabled:opacity-50 transition-colors"
+              >
+                {isSendingOtp ? 'Sending...' : 'Resend Code'}
+              </button>
             </form>
           </div>
         </div>
