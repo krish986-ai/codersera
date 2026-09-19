@@ -9,7 +9,7 @@ import {
   getDocs,
   serverTimestamp
 } from 'firebase/firestore';
-import { getAuth, Auth } from 'firebase/auth';
+import { getAuth, Auth, isSignInWithEmailLink, sendSignInLinkToEmail, signInWithEmailLink } from 'firebase/auth';
 import { StudentTicket } from '../types';
 
 export interface FirebaseCustomConfig {
@@ -158,6 +158,28 @@ export function getFirebaseInstance(overrideConfig?: FirebaseCustomConfig | null
   }
 
   return { app: null, db: null, auth: null, isConfigured: false };
+}
+
+export async function sendRegistrationEmailLink(email: string): Promise<boolean> {
+  const { auth } = getFirebaseInstance();
+  if (!auth) throw new Error('Firebase email verification is not configured.');
+
+  await sendSignInLinkToEmail(auth, email, {
+    url: window.location.origin,
+    handleCodeInApp: true,
+  });
+  window.localStorage.setItem('codersera_pending_email', email);
+  return true;
+}
+
+export async function completeRegistrationEmailLink(email: string): Promise<boolean> {
+  const { auth } = getFirebaseInstance();
+  if (!auth || !isSignInWithEmailLink(auth, window.location.href)) return false;
+
+  await signInWithEmailLink(auth, email, window.location.href);
+  window.localStorage.removeItem('codersera_pending_email');
+  window.history.replaceState({}, document.title, window.location.pathname);
+  return true;
 }
 
 /**

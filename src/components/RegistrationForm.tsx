@@ -9,7 +9,11 @@ import {
   findExistingTicket, generateUniqueTicketId, saveTickets, getStoredTickets,
   getStoredEvents, saveEvents
 } from '../lib/storage';
-import { syncTicketToCloud } from '../lib/firebaseConfig';
+import {
+  completeRegistrationEmailLink,
+  sendRegistrationEmailLink,
+  syncTicketToCloud,
+} from '../lib/firebaseConfig';
 
 interface RegistrationFormProps {
   selectedEvent: CommunityEvent;
@@ -62,9 +66,7 @@ export const RegistrationForm: React.FC<RegistrationFormProps> = ({
   const [photoError, setPhotoError] = useState<string>('');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Email verification state
-  const [verificationCode, setVerificationCode] = useState('');
-  const [enteredCode, setEnteredCode] = useState('');
+  // Email-link verification state
   const [verificationSent, setVerificationSent] = useState(false);
   const [verificationError, setVerificationError] = useState('');
   const [isVerifying, setIsVerifying] = useState(false);
@@ -73,6 +75,17 @@ export const RegistrationForm: React.FC<RegistrationFormProps> = ({
   const [gdprConsent, setGdprConsent] = useState(false);
   const [generalError, setGeneralError] = useState<string>('');
   const [duplicateTicketFound, setDuplicateTicketFound] = useState<StudentTicket | null>(null);
+
+  React.useEffect(() => {
+    const pendingEmail = window.localStorage.getItem('codersera_pending_email');
+    if (pendingEmail && pendingEmail === email.trim().toLowerCase() && window.location.search) {
+      completeRegistrationEmailLink(pendingEmail)
+        .then((verified) => {
+          if (verified) setStep('details');
+        })
+        .catch(() => setVerificationError('This verification link is invalid or expired. Please request a new link.'));
+    }
+  }, [email]);
 
   // Handle Photo Upload with strictly <= 1.00 MB validation
   const handlePhotoSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -137,33 +150,37 @@ export const RegistrationForm: React.FC<RegistrationFormProps> = ({
       return;
     }
 
-    // Generate 6-digit OTP verification code
-    const generatedCode = Math.floor(100000 + Math.random() * 900000).toString();
-    setVerificationCode(generatedCode);
-    setVerificationSent(true);
-    setStep('verify-email');
+    sendRegistrationEmailLink(email.trim().toLowerCase())
+      .then(() => {
+        setVerificationSent(true);
+        setStep('verify-email');
+      })
+      .catch((error: unknown) => {
+        setGeneralError(error instanceof Error ? error.message : 'Unable to send the verification email.');
+      });
   };
 
-  // Step 2: Confirm OTP & Issue Unique Ticket
+  // Step 2: Confirm email link & issue unique ticket
   const handleConfirmVerification = (e: React.FormEvent) => {
     e.preventDefault();
     setVerificationError('');
 
-    if (enteredCode.trim() !== verificationCode.trim()) {
-      setVerificationError('Invalid verification code. Please check the code and try again.');
-      return;
-    }
-
     setIsVerifying(true);
-
-    setTimeout(() => {
+    const pendingEmail = window.localStorage.getItem('codersera_pending_email') || email.trim().toLowerCase();
+    completeRegistrationEmailLink(pendingEmail)
+      .then((verified) => {
+        if (!verified) {
+          setVerificationError('Open the verification link sent to your inbox before continuing.');
+          setIsVerifying(false);
+          return;
+        }
       // Re-verify duplicate constraint atomically
       const existing = findExistingTicket(email, rollNumber, selectedEvent.id);
       if (existing) {
         setIsVerifying(false);
         setDuplicateTicketFound(existing);
         setVerificationError('A ticket was already generated for this user.');
-        return;
+          return;
       }
 
       // Generate Unique Ticket Number (e.g. CE-2026-4821-X9)
@@ -185,7 +202,6 @@ export const RegistrationForm: React.FC<RegistrationFormProps> = ({
         linkedinUrl: linkedinUrl.trim() || undefined,
         photoBase64,
         isVerified: true,
-        verificationCode,
         checkedIn: false,
         createdAt: new Date().toISOString(),
         qrPayload,
@@ -212,7 +228,11 @@ export const RegistrationForm: React.FC<RegistrationFormProps> = ({
 
       setIsVerifying(false);
       onTicketGenerated(newTicket);
-    }, 600);
+      })
+      .catch(() => {
+        setIsVerifying(false);
+        setVerificationError('This verification link is invalid or expired. Please request a new link.');
+      });
   };
 
   return (
@@ -552,7 +572,7 @@ export const RegistrationForm: React.FC<RegistrationFormProps> = ({
         </form>
       )}
 
-      {/* STEP 2: Email Verification (OTP) */}
+      {/* STEP 2: Email Verification Link */}
       {step === 'verify-email' && (
         <div className="bg-[#121215] border border-[#27272a] rounded-2xl p-6 sm:p-8">
           <div className="text-center max-w-md mx-auto">
@@ -560,21 +580,17 @@ export const RegistrationForm: React.FC<RegistrationFormProps> = ({
               <Mail className="w-6 h-6" />
             </div>
 
-            <h3 className="text-xl font-bold text-white font-display">Email Verification</h3>
+            <h3 className="text-xl font-bold text-white font-display">Check Your Email</h3>
             <p className="text-xs text-slate-400 mt-2">
-              We generated a secure verification token for <strong className="text-cyan-300 font-mono">{email}</strong>.
+              We sent a secure verification link to <strong className="text-cyan-300 font-mono">{email}</strong>.
             </p>
 
-            {/* Instant Verification Code Display */}
             <div className="my-5 p-4 rounded-xl bg-[#18181b] border border-dashed border-cyan-500/40">
               <span className="text-[10px] uppercase font-mono text-slate-400 block mb-1">
-                Generated Verification Token (6-Digit OTP)
+                Verification link sent
               </span>
-              <div className="text-2xl font-mono font-black tracking-widest text-cyan-400">
-                {verificationCode}
-              </div>
               <span className="text-[10px] text-slate-500 font-mono block mt-1">
-                Enter this code below to issue your badge.
+                Open the link in your inbox, then return here to issue your badge.
               </span>
             </div>
 
@@ -585,19 +601,6 @@ export const RegistrationForm: React.FC<RegistrationFormProps> = ({
             )}
 
             <form onSubmit={handleConfirmVerification} className="space-y-4">
-              <div>
-                <input
-                  id="otp-input"
-                  type="text"
-                  required
-                  maxLength={6}
-                  value={enteredCode}
-                  onChange={(e) => setEnteredCode(e.target.value.trim())}
-                  placeholder="Enter 6-digit code"
-                  className="w-full text-center text-2xl tracking-[0.3em] font-mono py-3 rounded-xl bg-[#18181b] border border-[#27272a] text-cyan-400 focus:border-cyan-400 focus:outline-none"
-                />
-              </div>
-
               <div className="flex items-center gap-3">
                 <button
                   type="button"
@@ -610,7 +613,7 @@ export const RegistrationForm: React.FC<RegistrationFormProps> = ({
                 <button
                   id="confirm-ticket-generation-btn"
                   type="submit"
-                  disabled={isVerifying || enteredCode.length < 6}
+                  disabled={isVerifying || !verificationSent}
                   className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl bg-cyan-500 hover:bg-cyan-400 disabled:opacity-50 text-slate-950 font-bold text-xs shadow-[0_0_20px_rgba(56,189,248,0.25)] transition-all font-mono"
                 >
                   {isVerifying ? (
