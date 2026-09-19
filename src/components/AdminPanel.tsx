@@ -1,6 +1,7 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
+import jsQR from 'jsqr';
 import { 
-  ShieldCheck, Lock, Users, Calendar, Download, Search, Filter, 
+  ShieldCheck, Lock, Users, Calendar, Download, Search, Filter, Camera,
   Trash2, Edit3, Image, RefreshCw, CheckCircle2, XCircle, 
   Sparkles,   Plus, Eye, KeyRound, AlertTriangle, ArrowUpDown, 
   QrCode, Check, ToggleLeft, ToggleRight, X, Clock, MapPin, Tag,
@@ -80,6 +81,12 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   // Scanner Simulator
   const [scannedCode, setScannedCode] = useState('');
   const [scanResult, setScanResult] = useState<{ status: 'success' | 'not-found' | 'already-checked'; ticket?: StudentTicket } | null>(null);
+  const [cameraOpen, setCameraOpen] = useState(false);
+  const [cameraError, setCameraError] = useState('');
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const cameraStreamRef = useRef<MediaStream | null>(null);
+  const scanCanvasRef = useRef<HTMLCanvasElement>(null);
+  const scanFrameRef = useRef<number | null>(null);
 
   // Notifications
   const [cleanupMessage, setCleanupMessage] = useState('');
@@ -183,6 +190,69 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
       setScanResult({ status: 'success', ticket: { ...found, checkedIn: true, checkedInAt: new Date().toISOString() } });
     }
   };
+
+  const stopCameraScanner = () => {
+    if (scanFrameRef.current !== null) cancelAnimationFrame(scanFrameRef.current);
+    scanFrameRef.current = null;
+    cameraStreamRef.current?.getTracks().forEach((track) => track.stop());
+    cameraStreamRef.current = null;
+    setCameraOpen(false);
+  };
+
+  const scanCameraFrame = () => {
+    const video = videoRef.current;
+    const canvas = scanCanvasRef.current;
+    if (!video || !canvas || video.readyState < HTMLMediaElement.HAVE_CURRENT_DATA) {
+      scanFrameRef.current = requestAnimationFrame(scanCameraFrame);
+      return;
+    }
+
+    const context = canvas.getContext('2d', { willReadFrequently: true });
+    if (!context || video.videoWidth === 0) {
+      scanFrameRef.current = requestAnimationFrame(scanCameraFrame);
+      return;
+    }
+
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    context.drawImage(video, 0, 0, canvas.width, canvas.height);
+    const image = context.getImageData(0, 0, canvas.width, canvas.height);
+    const result = jsQR(image.data, image.width, image.height, { inversionAttempts: 'attemptBoth' });
+
+    if (result?.data) {
+      setScannedCode(result.data);
+      stopCameraScanner();
+      const form = document.getElementById('scanner-manual-form') as HTMLFormElement | null;
+      form?.requestSubmit();
+      return;
+    }
+
+    scanFrameRef.current = requestAnimationFrame(scanCameraFrame);
+  };
+
+  const startCameraScanner = async () => {
+    setCameraError('');
+    try {
+      if (!navigator.mediaDevices?.getUserMedia) {
+        throw new Error('Camera access is not supported by this browser.');
+      }
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: { ideal: 'environment' } },
+        audio: false,
+      });
+      cameraStreamRef.current = stream;
+      setCameraOpen(true);
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+        await videoRef.current.play();
+      }
+      scanFrameRef.current = requestAnimationFrame(scanCameraFrame);
+    } catch (error: unknown) {
+      setCameraError(error instanceof Error ? error.message : 'Unable to access the camera. Check browser permissions.');
+    }
+  };
+
+  useEffect(() => () => stopCameraScanner(), []);
 
   // Request Secondary Auth for image cleanup
   const requestImageCleanup = () => {
@@ -917,7 +987,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
               Scan attendee QR code or type Ticket Number to verify entry and log gate attendance.
             </p>
 
-            <form onSubmit={handleManualScan} className="mt-5 flex gap-2">
+            <form id="scanner-manual-form" onSubmit={handleManualScan} className="mt-5 flex flex-col sm:flex-row gap-2">
               <input
                 id="scanner-ticket-input"
                 type="text"
@@ -934,6 +1004,44 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                 Verify & Check-in
               </button>
             </form>
+
+            <div className="mt-3 flex flex-col sm:flex-row gap-2">
+              {!cameraOpen ? (
+                <button
+                  type="button"
+                  onClick={startCameraScanner}
+                  className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs font-mono transition-all"
+                >
+                  <Camera className="w-4 h-4" />
+                  Scan with Camera
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={stopCameraScanner}
+                  className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-red-500 hover:bg-red-400 text-white font-bold text-xs font-mono transition-all"
+                >
+                  <X className="w-4 h-4" />
+                  Stop Camera
+                </button>
+              )}
+            </div>
+
+            {cameraOpen && (
+              <div className="mt-4 overflow-hidden rounded-2xl border border-emerald-500/40 bg-black">
+                <video ref={videoRef} muted playsInline className="w-full aspect-video object-cover" />
+                <div className="px-3 py-2 text-[11px] text-emerald-300 font-mono text-center">
+                  Point the camera at the attendee QR code.
+                </div>
+                <canvas ref={scanCanvasRef} className="hidden" />
+              </div>
+            )}
+
+            {cameraError && (
+              <p className="mt-3 p-3 rounded-xl bg-red-950/50 border border-red-500/40 text-red-200 text-xs font-mono">
+                {cameraError} Use manual Pass ID entry as a fallback.
+              </p>
+            )}
           </div>
 
           {/* Scan Result Box */}
