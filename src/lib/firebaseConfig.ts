@@ -142,7 +142,7 @@ export async function sendRegistrationEmailLink(email: string): Promise<boolean>
     url: window.location.origin,
     handleCodeInApp: true,
   });
-  window.localStorage.setItem('codersera_pending_email', email);
+  window.sessionStorage.setItem('codersera_pending_email', email);
   return true;
 }
 
@@ -151,6 +151,7 @@ export async function completeRegistrationEmailLink(email: string): Promise<bool
   if (!auth || !isSignInWithEmailLink(auth, window.location.href)) return false;
 
   await signInWithEmailLink(auth, email, window.location.href);
+  window.sessionStorage.removeItem('codersera_pending_email');
   window.localStorage.removeItem('codersera_pending_email');
   window.history.replaceState({}, document.title, window.location.pathname);
   return true;

@@ -45,6 +45,7 @@ export const RegistrationForm: React.FC<RegistrationFormProps> = ({
   onViewExistingTicket,
   onCancel,
 }) => {
+  const registrationDraftKey = `codersera_registration_draft_${selectedEvent.id}`;
   // Form step: 'details' -> 'verify-email' -> 'completed'
   const [step, setStep] = useState<'details' | 'verify-email'>('details');
 
@@ -75,15 +76,55 @@ export const RegistrationForm: React.FC<RegistrationFormProps> = ({
   const [duplicateTicketFound, setDuplicateTicketFound] = useState<StudentTicket | null>(null);
 
   React.useEffect(() => {
-    const pendingEmail = window.localStorage.getItem('codersera_pending_email');
-    if (pendingEmail && pendingEmail === email.trim().toLowerCase() && window.location.search) {
-      completeRegistrationEmailLink(pendingEmail)
-        .then(async (verified) => {
-          if (verified) setStep('details');
-        })
-        .catch(() => setVerificationError('This verification link is invalid or expired. Please request a new link.'));
+    const savedDraft = window.sessionStorage.getItem(registrationDraftKey);
+    if (savedDraft) {
+      try {
+        const draft = JSON.parse(savedDraft) as Partial<{
+          fullName: string;
+          email: string;
+          rollNumber: string;
+          collegeName: string;
+          branch: Branch;
+          year: AcademicYear;
+          phoneNumber: string;
+          githubUrl: string;
+          linkedinUrl: string;
+          photoBase64: string;
+          photoSizeKb: number;
+          gdprConsent: boolean;
+        }>;
+        setFullName(draft.fullName || '');
+        setEmail(draft.email || '');
+        setRollNumber(draft.rollNumber || '');
+        setCollegeName(draft.collegeName || '');
+        if (draft.branch) setBranch(draft.branch);
+        if (draft.year) setYear(draft.year);
+        setPhoneNumber(draft.phoneNumber || '');
+        setGithubUrl(draft.githubUrl || '');
+        setLinkedinUrl(draft.linkedinUrl || '');
+        setPhotoBase64(draft.photoBase64 || '');
+        setPhotoSizeKb(draft.photoSizeKb || 0);
+        setGdprConsent(Boolean(draft.gdprConsent));
+      } catch {
+        window.sessionStorage.removeItem(registrationDraftKey);
+      }
     }
-  }, [email]);
+
+    const pendingEmail = window.sessionStorage.getItem('codersera_pending_email')
+      || window.localStorage.getItem('codersera_pending_email');
+    if (!pendingEmail || !window.location.search) return;
+
+    completeRegistrationEmailLink(pendingEmail)
+      .then((verified) => {
+        if (verified) {
+          setEmail(pendingEmail);
+          setVerificationSent(false);
+          setStep('details');
+          setVerificationError('');
+        }
+      })
+      .catch(() => setVerificationError('This verification link is invalid or expired. Please request a new link.'));
+  }, [registrationDraftKey]);
 
   // Handle Photo Upload with strictly <= 1.00 MB validation
   const handlePhotoSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -148,6 +189,12 @@ export const RegistrationForm: React.FC<RegistrationFormProps> = ({
       return;
     }
 
+    window.sessionStorage.setItem(registrationDraftKey, JSON.stringify({
+      fullName, email: email.trim().toLowerCase(), rollNumber, collegeName, branch, year,
+      phoneNumber, githubUrl, linkedinUrl, photoBase64, photoSizeKb, gdprConsent,
+    }));
+    window.sessionStorage.setItem('codersera_pending_email', email.trim().toLowerCase());
+
     sendRegistrationEmailLink(email.trim().toLowerCase())
       .then(() => {
         setVerificationSent(true);
@@ -164,7 +211,9 @@ export const RegistrationForm: React.FC<RegistrationFormProps> = ({
     setVerificationError('');
 
     setIsVerifying(true);
-    const pendingEmail = window.localStorage.getItem('codersera_pending_email') || email.trim().toLowerCase();
+    const pendingEmail = window.sessionStorage.getItem('codersera_pending_email')
+      || window.localStorage.getItem('codersera_pending_email')
+      || email.trim().toLowerCase();
     completeRegistrationEmailLink(pendingEmail)
       .then(async (verified) => {
         if (!verified) {
