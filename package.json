@@ -4,7 +4,7 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "concurrently --kill-others-on-fail \"npm run auth\" \"vite --port=3000 --strictPort --host=0.0.0.0\"",
+    "dev": "concurrently --kill-others-on-fail \"npm run auth\" \"wait-on http://localhost:3001/api/auth/session && vite --port=3000 --strictPort --host=0.0.0.0\"",
     "auth": "tsx server.ts",
     "dev:full": "npm run dev",
     "build": "vite build",
@@ -41,6 +41,7 @@
     "esbuild": "^0.28.2",
     "tailwindcss": "^4.3.3",
     "tsx": "^4.21.0",
-    "typescript": "^7.0.2"
+    "typescript": "^7.0.2",
+    "wait-on": "^9.1.0"
   }
 }

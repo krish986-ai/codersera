@@ -1,6 +1,14 @@
 import { config } from 'dotenv';
 import express from 'express';
 import { randomBytes, scryptSync, timingSafeEqual } from 'node:crypto';
+import eventsHandler from './api/events.ts';
+import registrationHandler from './api/registration.ts';
+import lookupHandler from './api/tickets/lookup.ts';
+import adminEventsHandler from './api/admin/events.ts';
+import adminTicketsHandler from './api/admin/tickets.ts';
+import adminCheckInHandler from './api/admin/check-in.ts';
+import adminCleanupHandler from './api/admin/cleanup-images.ts';
+import { createSession, expiredSessionCookie, isAuthenticated, sessionCookie } from './api/_auth.ts';
 
 config({ path: '.env.local' });
 config();
@@ -15,38 +23,7 @@ if (!adminPassword || adminPassword.length < 12) {
 
 const passwordSalt = randomBytes(16);
 const passwordHash = scryptSync(adminPassword, passwordSalt, 64);
-const sessions = new Map<string, number>();
-const SESSION_TTL_MS = 8 * 60 * 60 * 1000;
-
-app.use(express.json({ limit: '10kb' }));
-
-function getSessionToken(request: express.Request): string | null {
-  const cookieHeader = request.headers.cookie || '';
-  const sessionCookie = cookieHeader
-    .split(';')
-    .map((cookie) => cookie.trim())
-    .find((cookie) => cookie.startsWith('codersera_session='));
-  return sessionCookie ? decodeURIComponent(sessionCookie.slice('codersera_session='.length)) : null;
-}
-
-function isAuthenticated(request: express.Request): boolean {
-  const token = getSessionToken(request);
-  if (!token) return false;
-  const expiresAt = sessions.get(token);
-  if (!expiresAt || expiresAt <= Date.now()) {
-    sessions.delete(token);
-    return false;
-  }
-  sessions.set(token, Date.now() + SESSION_TTL_MS);
-  return true;
-}
-
-function setSessionCookie(response: express.Response, token: string) {
-  response.setHeader(
-    'Set-Cookie',
-    `codersera_session=${encodeURIComponent(token)}; HttpOnly; SameSite=Strict; Path=/; Max-Age=${SESSION_TTL_MS / 1000}`
-  );
-}
+app.use(express.json({ limit: '2mb' }));
 
 app.get('/api/auth/session', (request, response) => {
   response.json({ authenticated: isAuthenticated(request) });
@@ -62,18 +39,22 @@ app.post('/api/auth/login', (request, response) => {
     return;
   }
 
-  const token = randomBytes(32).toString('base64url');
-  sessions.set(token, Date.now() + SESSION_TTL_MS);
-  setSessionCookie(response, token);
+  response.setHeader('Set-Cookie', sessionCookie(createSession()));
   response.json({ authenticated: true });
 });
 
 app.post('/api/auth/logout', (request, response) => {
-  const token = getSessionToken(request);
-  if (token) sessions.delete(token);
-  response.setHeader('Set-Cookie', 'codersera_session=; HttpOnly; SameSite=Strict; Path=/; Max-Age=0');
+  response.setHeader('Set-Cookie', expiredSessionCookie);
   response.status(204).end();
 });
+
+app.get('/api/events', (request, response) => void eventsHandler(request, response));
+app.post('/api/registration', (request, response) => void registrationHandler(request, response));
+app.get('/api/tickets/lookup', (request, response) => void lookupHandler(request, response));
+app.all('/api/admin/events', (request, response) => void adminEventsHandler(request, response));
+app.all('/api/admin/tickets', (request, response) => void adminTicketsHandler(request, response));
+app.post('/api/admin/check-in', (request, response) => void adminCheckInHandler(request, response));
+app.post('/api/admin/cleanup-images', (request, response) => void adminCleanupHandler(request, response));
 
 app.get('/api/admin/health', (request, response) => {
   if (!isAuthenticated(request)) {
