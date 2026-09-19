@@ -87,6 +87,10 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   const cameraStreamRef = useRef<MediaStream | null>(null);
   const scanCanvasRef = useRef<HTMLCanvasElement>(null);
   const scanFrameRef = useRef<number | null>(null);
+  const scanBusyRef = useRef(false);
+  const lastFrameAtRef = useRef(0);
+  const lastDecodedValueRef = useRef('');
+  const canvasContextRef = useRef<CanvasRenderingContext2D | null>(null);
 
   // Notifications
   const [cleanupMessage, setCleanupMessage] = useState('');
@@ -169,11 +173,9 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   };
 
   // Trigger Scanner Verification
-  const handleManualScan = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!scannedCode.trim()) return;
-
-    const raw = scannedCode.trim();
+  const verifyScannedCode = (value: string) => {
+    const raw = value.trim();
+    if (!raw) return;
     const ticketId = raw.includes('|') ? raw.split('|')[0] : raw;
 
     const found = tickets.find(t => t.id.toLowerCase() === ticketId.toLowerCase());
@@ -196,15 +198,29 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     }
   };
 
+  const handleManualScan = (e: React.FormEvent) => {
+    e.preventDefault();
+    verifyScannedCode(scannedCode);
+  };
+
   const stopCameraScanner = () => {
     if (scanFrameRef.current !== null) cancelAnimationFrame(scanFrameRef.current);
     scanFrameRef.current = null;
     cameraStreamRef.current?.getTracks().forEach((track) => track.stop());
     cameraStreamRef.current = null;
+    canvasContextRef.current = null;
+    scanBusyRef.current = false;
     setCameraOpen(false);
   };
 
-  const scanCameraFrame = () => {
+  const scanCameraFrame = (timestamp = 0) => {
+    if (!cameraOpen || scanBusyRef.current) return;
+    if (timestamp - lastFrameAtRef.current < 120) {
+      scanFrameRef.current = requestAnimationFrame(scanCameraFrame);
+      return;
+    }
+    lastFrameAtRef.current = timestamp;
+
     const video = videoRef.current;
     const canvas = scanCanvasRef.current;
     if (!video || !canvas || video.readyState < HTMLMediaElement.HAVE_CURRENT_DATA) {
@@ -212,24 +228,33 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
       return;
     }
 
-    const context = canvas.getContext('2d', { willReadFrequently: true });
+    const context = canvasContextRef.current || canvas.getContext('2d', { willReadFrequently: true });
+    canvasContextRef.current = context;
     if (!context || video.videoWidth === 0) {
       scanFrameRef.current = requestAnimationFrame(scanCameraFrame);
       return;
     }
 
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
+    const scale = Math.min(1, 640 / video.videoWidth);
+    const width = Math.round(video.videoWidth * scale);
+    const height = Math.round(video.videoHeight * scale);
+    if (canvas.width !== width || canvas.height !== height) {
+      canvas.width = width;
+      canvas.height = height;
+    }
     context.drawImage(video, 0, 0, canvas.width, canvas.height);
     const image = context.getImageData(0, 0, canvas.width, canvas.height);
-    const result = jsQR(image.data, image.width, image.height, { inversionAttempts: 'attemptBoth' });
+    const result = jsQR(image.data, image.width, image.height, { inversionAttempts: 'dontInvert' });
 
-    if (result?.data) {
+    if (result?.data && result.data !== lastDecodedValueRef.current) {
+      lastDecodedValueRef.current = result.data;
       setScannedCode(result.data);
-      stopCameraScanner();
-      const form = document.getElementById('scanner-manual-form') as HTMLFormElement | null;
-      form?.requestSubmit();
-      return;
+      scanBusyRef.current = true;
+      verifyScannedCode(result.data);
+      window.setTimeout(() => {
+        lastDecodedValueRef.current = '';
+        scanBusyRef.current = false;
+      }, 1200);
     }
 
     scanFrameRef.current = requestAnimationFrame(scanCameraFrame);
@@ -237,25 +262,38 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
 
   const startCameraScanner = async () => {
     setCameraError('');
+    setScanResult(null);
     try {
       if (!navigator.mediaDevices?.getUserMedia) {
         throw new Error('Camera access is not supported by this browser.');
       }
+      stopCameraScanner();
       const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: { ideal: 'environment' } },
+        video: {
+          facingMode: { ideal: 'environment' },
+          width: { ideal: 1280 },
+          height: { ideal: 720 },
+        },
         audio: false,
       });
       cameraStreamRef.current = stream;
       setCameraOpen(true);
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-        await videoRef.current.play();
-      }
-      scanFrameRef.current = requestAnimationFrame(scanCameraFrame);
     } catch (error: unknown) {
       setCameraError(error instanceof Error ? error.message : 'Unable to access the camera. Check browser permissions.');
     }
   };
+
+  useEffect(() => {
+    if (!cameraOpen || !cameraStreamRef.current || !videoRef.current) return;
+    const video = videoRef.current;
+    video.srcObject = cameraStreamRef.current;
+    video.play()
+      .then(() => {
+        lastFrameAtRef.current = 0;
+        scanFrameRef.current = requestAnimationFrame(scanCameraFrame);
+      })
+      .catch(() => setCameraError('The camera opened but the preview could not start. Tap Stop Camera and try again.'));
+  }, [cameraOpen]);
 
   useEffect(() => () => stopCameraScanner(), []);
 
@@ -1034,9 +1072,14 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
 
             {cameraOpen && (
               <div className="mt-4 overflow-hidden rounded-2xl border border-emerald-500/40 bg-black">
-                <video ref={videoRef} muted playsInline className="w-full aspect-video object-cover" />
+                <div className="relative">
+                  <video ref={videoRef} muted playsInline autoPlay className="w-full aspect-video object-cover" />
+                  <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+                    <div className="h-40 w-40 rounded-2xl border-2 border-emerald-400/80 shadow-[0_0_0_999px_rgba(0,0,0,0.2)]" />
+                  </div>
+                </div>
                 <div className="px-3 py-2 text-[11px] text-emerald-300 font-mono text-center">
-                  Point the camera at the attendee QR code.
+                  Camera ready — align the QR code inside the box. The camera stays on for continuous entry.
                 </div>
                 <canvas ref={scanCanvasRef} className="hidden" />
               </div>
