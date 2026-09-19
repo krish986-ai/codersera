@@ -1,15 +1,6 @@
 import { jsonBody, methodNotAllowed } from '../_http.js';
+import { firestore } from '../_firebaseAdmin.js';
 import nodemailer from 'nodemailer';
-
-interface OtpRecord {
-  code: string;
-  email: string;
-  purpose: 'registration' | 'login';
-  expiresAt: number;
-  attempts: number;
-}
-
-const otpStore = new Map<string, OtpRecord>();
 
 function generateOtp(): string {
   return Math.floor(100000 + Math.random() * 900000).toString();
@@ -40,13 +31,6 @@ async function sendOtpEmail(email: string, code: string, purpose: string) {
   return true;
 }
 
-setInterval(() => {
-  const now = Date.now();
-  for (const [key, record] of otpStore.entries()) {
-    if (now > record.expiresAt) otpStore.delete(key);
-  }
-}, 5 * 60 * 1000);
-
 export default async function handler(request: any, response: any) {
   if (request.method !== 'POST') return methodNotAllowed(response, ['POST']);
   const { email, purpose = 'registration' } = jsonBody(request);
@@ -56,13 +40,14 @@ export default async function handler(request: any, response: any) {
   const normalizedEmail = email.trim().toLowerCase();
   const code = generateOtp();
   const expiresAt = Date.now() + 10 * 60 * 1000;
-  otpStore.set(normalizedEmail, { code, email: normalizedEmail, purpose, expiresAt, attempts: 0 });
+  const db = firestore();
+  await db.collection('otps').doc(normalizedEmail).set({ code, email: normalizedEmail, purpose, expiresAt, attempts: 0 });
   try {
     await sendOtpEmail(normalizedEmail, code, purpose === 'registration' ? 'registration' : 'login');
     response.status(200).json({ success: true, message: 'OTP sent to your email.' });
   } catch (error) {
     console.error('Failed to send OTP email:', error);
-    otpStore.delete(normalizedEmail);
+    await db.collection('otps').doc(normalizedEmail).delete();
     response.status(500).json({ error: 'Failed to send OTP. Check SMTP configuration.' });
   }
 }
