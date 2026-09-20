@@ -48,8 +48,8 @@ export default async function handler(request: any, response: any) {
       return methodNotAllowed(response, ['POST']);
     }
 
-    const body = jsonBody(request);
-    console.log('OTP handler: request body', body);
+    const body = await jsonBody(request);
+    console.log('OTP handler: request body', JSON.stringify(body), 'keys:', Object.keys(body));
 
     if (isSend) {
       const { email, purpose = 'registration' } = body;
