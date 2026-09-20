@@ -32,70 +32,75 @@ async function sendOtpEmail(email: string, code: string, purpose: string) {
 }
 
 export default async function handler(request: any, response: any) {
-  const url = request.url || '';
-  const path = new URL(url, `https://${request.headers.host}`).pathname;
-  const isSend = path.endsWith('/otp/send') || path === '/api/otp/send';
-  const isVerify = path.endsWith('/otp/verify') || path === '/api/otp/verify';
-  const db = firestore();
+  try {
+    const url = request.url || '';
+    const path = new URL(url, `https://${request.headers.host}`).pathname;
+    const isSend = path.endsWith('/otp/send') || path === '/api/otp/send';
+    const isVerify = path.endsWith('/otp/verify') || path === '/api/otp/verify';
+    const db = firestore();
 
-  if (!isSend && !isVerify) {
-    console.log('OTP handler: path not matched', path);
+    if (!isSend && !isVerify) {
+      console.log('OTP handler: path not matched', path);
+      return methodNotAllowed(response, ['POST']);
+    }
+
+    if (request.method !== 'POST') {
+      return methodNotAllowed(response, ['POST']);
+    }
+
+    const body = jsonBody(request);
+    console.log('OTP handler: request body', body);
+
+    if (isSend) {
+      const { email, purpose = 'registration' } = body;
+      if (!email || typeof email !== 'string') {
+        return response.status(400).json({ error: 'Email is required.' });
+      }
+      const normalizedEmail = email.trim().toLowerCase();
+      const code = generateOtp();
+      const expiresAt = Date.now() + 10 * 60 * 1000;
+      await db.collection('otps').doc(normalizedEmail).set({ code, email: normalizedEmail, purpose, expiresAt, attempts: 0 });
+      try {
+        await sendOtpEmail(normalizedEmail, code, purpose === 'registration' ? 'registration' : 'login');
+        return response.status(200).json({ success: true, message: 'OTP sent to your email.' });
+      } catch (error) {
+        console.error('Failed to send OTP email:', error);
+        await db.collection('otps').doc(normalizedEmail).delete();
+        return response.status(500).json({ error: 'Failed to send OTP. Check SMTP configuration.' });
+      }
+    }
+
+    if (isVerify) {
+      const { email, code } = body;
+      if (!email || !code) {
+        return response.status(400).json({ error: 'Email and code are required.' });
+      }
+      const normalizedEmail = email.trim().toLowerCase();
+      const doc = await db.collection('otps').doc(normalizedEmail).get();
+      if (!doc.exists) {
+        return response.status(400).json({ error: 'No OTP found for this email. Request a new one.' });
+      }
+      const record = doc.data()!;
+      if (Date.now() > record.expiresAt) {
+        await db.collection('otps').doc(normalizedEmail).delete();
+        return response.status(400).json({ error: 'OTP has expired. Request a new one.' });
+      }
+      if (record.attempts >= 5) {
+        await db.collection('otps').doc(normalizedEmail).delete();
+        return response.status(400).json({ error: 'Too many attempts. Request a new OTP.' });
+      }
+      record.attempts++;
+      if (record.code !== code) {
+        await db.collection('otps').doc(normalizedEmail).update({ attempts: record.attempts });
+        return response.status(400).json({ error: 'Invalid code. Please try again.' });
+      }
+      await db.collection('otps').doc(normalizedEmail).delete();
+      return response.status(200).json({ success: true, verified: true });
+    }
+
     return methodNotAllowed(response, ['POST']);
+  } catch (error) {
+    console.error('OTP handler error:', error);
+    return response.status(500).json({ error: 'Internal server error', details: error instanceof Error ? error.message : String(error) });
   }
-
-  if (request.method !== 'POST') {
-    return methodNotAllowed(response, ['POST']);
-  }
-
-  const body = jsonBody(request);
-  console.log('OTP handler: request body', body);
-
-  if (isSend) {
-    const { email, purpose = 'registration' } = body;
-    if (!email || typeof email !== 'string') {
-      return response.status(400).json({ error: 'Email is required.' });
-    }
-    const normalizedEmail = email.trim().toLowerCase();
-    const code = generateOtp();
-    const expiresAt = Date.now() + 10 * 60 * 1000;
-    await db.collection('otps').doc(normalizedEmail).set({ code, email: normalizedEmail, purpose, expiresAt, attempts: 0 });
-    try {
-      await sendOtpEmail(normalizedEmail, code, purpose === 'registration' ? 'registration' : 'login');
-      return response.status(200).json({ success: true, message: 'OTP sent to your email.' });
-    } catch (error) {
-      console.error('Failed to send OTP email:', error);
-      await db.collection('otps').doc(normalizedEmail).delete();
-      return response.status(500).json({ error: 'Failed to send OTP. Check SMTP configuration.' });
-    }
-  }
-
-  if (isVerify) {
-    const { email, code } = body;
-    if (!email || !code) {
-      return response.status(400).json({ error: 'Email and code are required.' });
-    }
-    const normalizedEmail = email.trim().toLowerCase();
-    const doc = await db.collection('otps').doc(normalizedEmail).get();
-    if (!doc.exists) {
-      return response.status(400).json({ error: 'No OTP found for this email. Request a new one.' });
-    }
-    const record = doc.data()!;
-    if (Date.now() > record.expiresAt) {
-      await db.collection('otps').doc(normalizedEmail).delete();
-      return response.status(400).json({ error: 'OTP has expired. Request a new one.' });
-    }
-    if (record.attempts >= 5) {
-      await db.collection('otps').doc(normalizedEmail).delete();
-      return response.status(400).json({ error: 'Too many attempts. Request a new OTP.' });
-    }
-    record.attempts++;
-    if (record.code !== code) {
-      await db.collection('otps').doc(normalizedEmail).update({ attempts: record.attempts });
-      return response.status(400).json({ error: 'Invalid code. Please try again.' });
-    }
-    await db.collection('otps').doc(normalizedEmail).delete();
-    return response.status(200).json({ success: true, verified: true });
-  }
-
-  return methodNotAllowed(response, ['POST']);
 }
