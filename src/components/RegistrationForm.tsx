@@ -39,6 +39,14 @@ const YEARS: AcademicYear[] = [
   'Working Professional / Builder',
 ];
 
+function emailVerificationError(error: unknown) {
+  const code = typeof error === 'object' && error && 'code' in error ? String(error.code) : '';
+  if (code === 'auth/quota-exceeded') {
+    return 'Email verification is temporarily unavailable because the daily Firebase email quota has been reached. Please try again after the quota resets, or contact the event team.';
+  }
+  return error instanceof Error ? error.message : 'Unable to send the verification email.';
+}
+
 export const RegistrationForm: React.FC<RegistrationFormProps> = ({
   selectedEvent,
   onTicketGenerated,
@@ -236,7 +244,7 @@ export const RegistrationForm: React.FC<RegistrationFormProps> = ({
       setVerificationSent(true);
       setStep('verify-email');
     } catch (error: unknown) {
-      setGeneralError(error instanceof Error ? error.message : 'Unable to send the verification email.');
+      setGeneralError(emailVerificationError(error));
     }
   };
 
