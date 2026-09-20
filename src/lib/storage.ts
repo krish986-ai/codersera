@@ -25,7 +25,11 @@ const request = async (url: string, init?: RequestInit) => {
 };
 const json = (body: unknown) => ({ method: 'POST', body: JSON.stringify(body) });
 
-export async function getStoredEvents(): Promise<CommunityEvent[]> { const events = await request('/api/events') as CommunityEvent[]; return events.length ? events : INITIAL_EVENTS; }
+export async function getStoredEvents(): Promise<CommunityEvent[]> {
+  // Do not mask an unavailable server with fictional event availability. The
+  // API seeds INITIAL_EVENTS on an empty Firestore database.
+  return request('/api/events') as Promise<CommunityEvent[]>;
+}
 export async function saveEvents(events: CommunityEvent[]) { await Promise.all(events.map(event => request('/api/admin/events', json({ event })))); }
 export async function getStoredTickets() { return request('/api/admin/tickets') as Promise<StudentTicket[]>; }
 export async function saveTickets(tickets: StudentTicket[]) {

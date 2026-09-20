@@ -42,7 +42,14 @@ export function isAuthenticated(request: any) {
 }
 
 export function sessionCookie(token: string) {
-  return `codersera_session=${encodeURIComponent(token)}; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=${SESSION_TTL_SECONDS}`;
+  // Browsers deliberately ignore Secure cookies on http://localhost. Keep the
+  // production cookie secure while allowing the documented local dev server to
+  // maintain an admin session.
+  const secure = process.env.NODE_ENV === 'production' ? '; Secure' : '';
+  return `codersera_session=${encodeURIComponent(token)}; HttpOnly${secure}; SameSite=Lax; Path=/; Max-Age=${SESSION_TTL_SECONDS}`;
 }
 
-export const expiredSessionCookie = 'codersera_session=; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=0';
+export function expiredSessionCookie() {
+  const secure = process.env.NODE_ENV === 'production' ? '; Secure' : '';
+  return `codersera_session=; HttpOnly${secure}; SameSite=Lax; Path=/; Max-Age=0`;
+}

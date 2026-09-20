@@ -26,7 +26,12 @@ export default async function handler(request: any, response: any) {
     }
     const id = String(body.id || request.query?.id || '');
     if (!id) return response.status(400).json({ error: 'Event id required.' });
-    if (request.method === 'DELETE') { await db.collection('events').doc(id).delete(); return response.status(204).end(); }
+    if (request.method === 'DELETE') {
+      const tickets = await db.collection('tickets').where('eventId', '==', id).limit(1).get();
+      if (!tickets.empty) return response.status(409).json({ error: 'This event has registrations and cannot be deleted. Close it instead to preserve attendee records.' });
+      await db.collection('events').doc(id).delete();
+      return response.status(204).end();
+    }
     if (request.method === 'PATCH') {
       const ref = db.collection('events').doc(id);
       const current = (await ref.get()).data() as any;

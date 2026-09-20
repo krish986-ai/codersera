@@ -180,9 +180,13 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
 
   // Toggle CheckIn
   const handleCheckInToggle = async (ticketId: string) => {
-    const ticket = tickets.find((candidate) => candidate.id === ticketId);
-    await toggleTicketCheckIn(ticketId, ticket?.qrPayload);
-    await refreshData();
+    try {
+      const ticket = tickets.find((candidate) => candidate.id === ticketId);
+      await toggleTicketCheckIn(ticketId, ticket?.qrPayload);
+      await refreshData();
+    } catch (error: unknown) {
+      setDataError(error instanceof Error ? error.message : 'Unable to update check-in status.');
+    }
   };
 
   // Trigger Scanner Verification
@@ -342,19 +346,23 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     eventId?: string;
   }) => {
 
-    if (action.type === 'cleanup') {
-      const count = await cleanupAttendeeImages(selectedEventId === 'all' ? undefined : selectedEventId);
-      await refreshData();
-      setCleanupMessage(`Successfully cleaned up ${count} attendee photos to save server storage.`);
-      setTimeout(() => setCleanupMessage(''), 5000);
-    } else if (action.type === 'delete' && action.ticketId) {
-      await deleteStudentTicket(action.ticketId);
-      await refreshData();
-    } else if (action.type === 'delete_event' && action.eventId) {
-      await deleteCommunityEvent(action.eventId);
-      await refreshData();
-      setEventActionSuccess('Event removed successfully from database.');
-      setTimeout(() => setEventActionSuccess(''), 4000);
+    try {
+      if (action.type === 'cleanup') {
+        const count = await cleanupAttendeeImages(selectedEventId === 'all' ? undefined : selectedEventId);
+        await refreshData();
+        setCleanupMessage(`Successfully cleaned up ${count} attendee photos to save server storage.`);
+        setTimeout(() => setCleanupMessage(''), 5000);
+      } else if (action.type === 'delete' && action.ticketId) {
+        await deleteStudentTicket(action.ticketId);
+        await refreshData();
+      } else if (action.type === 'delete_event' && action.eventId) {
+        await deleteCommunityEvent(action.eventId);
+        await refreshData();
+        setEventActionSuccess('Event removed successfully from database.');
+        setTimeout(() => setEventActionSuccess(''), 4000);
+      }
+    } catch (error: unknown) {
+      setDataError(error instanceof Error ? error.message : 'The requested admin action could not be completed.');
     }
 
   };
@@ -364,9 +372,13 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     e.preventDefault();
     if (!editingTicket) return;
 
-    await updateStudentTicket(editingTicket.id, editingTicket);
-    await refreshData();
-    setEditingTicket(null);
+    try {
+      await updateStudentTicket(editingTicket.id, editingTicket);
+      await refreshData();
+      setEditingTicket(null);
+    } catch (error: unknown) {
+      setDataError(error instanceof Error ? error.message : 'Unable to save attendee changes.');
+    }
   };
 
   // Open Create Event Modal
@@ -430,6 +442,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
       .map(t => t.trim())
       .filter(Boolean);
 
+    try {
     if (editingEventId) {
       // Update existing
       await updateCommunityEvent(editingEventId, {
@@ -475,12 +488,19 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     await refreshData();
     setEventModalOpen(false);
     setTimeout(() => setEventActionSuccess(''), 4000);
+    } catch (error: unknown) {
+      setEventFormError(error instanceof Error ? error.message : 'Unable to save the event.');
+    }
   };
 
   // Quick Toggle Event Active Status
   const handleToggleEventStatus = async (eventId: string) => {
-    await toggleEventStatus(eventId);
-    await refreshData();
+    try {
+      await toggleEventStatus(eventId);
+      await refreshData();
+    } catch (error: unknown) {
+      setDataError(error instanceof Error ? error.message : 'Unable to update the event status.');
+    }
   };
 
   // IF NOT AUTHENTICATED: Show password lock screen

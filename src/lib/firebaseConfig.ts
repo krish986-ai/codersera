@@ -143,6 +143,8 @@ export async function sendRegistrationEmailLink(email: string): Promise<boolean>
     handleCodeInApp: true,
   });
   window.sessionStorage.setItem('codersera_pending_email', email);
+  // Email links are often opened in a new tab, where sessionStorage is empty.
+  window.localStorage.setItem('codersera_pending_email', email);
   return true;
 }
 

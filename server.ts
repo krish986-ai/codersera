@@ -45,7 +45,7 @@ app.post('/api/auth/login', (request, response) => {
 });
 
 app.post('/api/auth/logout', (request, response) => {
-  response.setHeader('Set-Cookie', expiredSessionCookie);
+  response.setHeader('Set-Cookie', expiredSessionCookie());
   response.status(204).end();
 });
 

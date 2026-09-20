@@ -75,6 +75,41 @@ export const RegistrationForm: React.FC<RegistrationFormProps> = ({
   const [generalError, setGeneralError] = useState<string>('');
   const [duplicateTicketFound, setDuplicateTicketFound] = useState<StudentTicket | null>(null);
 
+  const issueTicket = async () => {
+    const existing = await findExistingTicket(email, rollNumber, selectedEvent.id);
+    if (existing) {
+      setDuplicateTicketFound(existing);
+      throw new Error('A ticket was already generated for this user.');
+    }
+
+    const newTicketId = generateUniqueTicketId();
+    const qrPayload = `${newTicketId}|${email.trim().toLowerCase()}|${rollNumber.trim().toUpperCase()}|${selectedEvent.id}`;
+    const newTicket: StudentTicket = {
+      id: newTicketId,
+      eventId: selectedEvent.id,
+      eventTitle: selectedEvent.title,
+      fullName: fullName.trim(),
+      email: email.trim().toLowerCase(),
+      rollNumber: rollNumber.trim().toUpperCase(),
+      collegeName: collegeName.trim() || undefined,
+      branch,
+      year,
+      phoneNumber: phoneNumber.trim(),
+      githubUrl: githubUrl.trim() || undefined,
+      linkedinUrl: linkedinUrl.trim() || undefined,
+      photoBase64,
+      isVerified: true,
+      checkedIn: false,
+      createdAt: new Date().toISOString(),
+      qrPayload,
+      gdprConsent: true,
+    };
+    const createdTicket = await saveTickets([newTicket]);
+    window.sessionStorage.removeItem(registrationDraftKey);
+    window.sessionStorage.removeItem('codersera_email_verified');
+    onTicketGenerated(createdTicket || newTicket);
+  };
+
   React.useEffect(() => {
     const savedDraft = window.sessionStorage.getItem(registrationDraftKey);
     if (savedDraft) {
@@ -118,8 +153,9 @@ export const RegistrationForm: React.FC<RegistrationFormProps> = ({
       .then((verified) => {
         if (verified) {
           setEmail(pendingEmail);
-          setVerificationSent(false);
-          setStep('details');
+          window.sessionStorage.setItem('codersera_email_verified', pendingEmail.toLowerCase());
+          setVerificationSent(true);
+          setStep('verify-email');
           setVerificationError('');
         }
       })
@@ -195,14 +231,13 @@ export const RegistrationForm: React.FC<RegistrationFormProps> = ({
     }));
     window.sessionStorage.setItem('codersera_pending_email', email.trim().toLowerCase());
 
-    sendRegistrationEmailLink(email.trim().toLowerCase())
-      .then(() => {
-        setVerificationSent(true);
-        setStep('verify-email');
-      })
-      .catch((error: unknown) => {
-        setGeneralError(error instanceof Error ? error.message : 'Unable to send the verification email.');
-      });
+    try {
+      await sendRegistrationEmailLink(email.trim().toLowerCase());
+      setVerificationSent(true);
+      setStep('verify-email');
+    } catch (error: unknown) {
+      setGeneralError(error instanceof Error ? error.message : 'Unable to send the verification email.');
+    }
   };
 
   // Step 2: Confirm email link & issue unique ticket
@@ -214,56 +249,20 @@ export const RegistrationForm: React.FC<RegistrationFormProps> = ({
     const pendingEmail = window.sessionStorage.getItem('codersera_pending_email')
       || window.localStorage.getItem('codersera_pending_email')
       || email.trim().toLowerCase();
-    completeRegistrationEmailLink(pendingEmail)
-      .then(async (verified) => {
-        if (!verified) {
-          setVerificationError('Open the verification link sent to your inbox before continuing.');
-          setIsVerifying(false);
-          return;
-        }
-      // Re-verify duplicate constraint atomically
-      const existing = await findExistingTicket(email, rollNumber, selectedEvent.id);
-      if (existing) {
-        setIsVerifying(false);
-        setDuplicateTicketFound(existing);
-        setVerificationError('A ticket was already generated for this user.');
-          return;
+    try {
+      const verifiedEmail = window.sessionStorage.getItem('codersera_email_verified');
+      const verified = verifiedEmail === pendingEmail.toLowerCase()
+        || await completeRegistrationEmailLink(pendingEmail);
+      if (!verified) {
+        setVerificationError('Open the verification link sent to your inbox before continuing.');
+        return;
       }
-
-      // Generate Unique Ticket Number (e.g. CE-2026-4821-X9)
-      const newTicketId = generateUniqueTicketId();
-      const qrPayload = `${newTicketId}|${email.trim().toLowerCase()}|${rollNumber.trim().toUpperCase()}|${selectedEvent.id}`;
-
-      const newTicket: StudentTicket = {
-        id: newTicketId,
-        eventId: selectedEvent.id,
-        eventTitle: selectedEvent.title,
-        fullName: fullName.trim(),
-        email: email.trim().toLowerCase(),
-        rollNumber: rollNumber.trim().toUpperCase(),
-        collegeName: collegeName.trim() || undefined,
-        branch,
-        year,
-        phoneNumber: phoneNumber.trim(),
-        githubUrl: githubUrl.trim() || undefined,
-        linkedinUrl: linkedinUrl.trim() || undefined,
-        photoBase64,
-        isVerified: true,
-        checkedIn: false,
-        createdAt: new Date().toISOString(),
-        qrPayload,
-        gdprConsent: true,
-      };
-
-      const createdTicket = await saveTickets([newTicket]);
-
+      await issueTicket();
+    } catch (error: unknown) {
+      setVerificationError(error instanceof Error ? error.message : 'This verification link is invalid or expired. Please request a new link.');
+    } finally {
       setIsVerifying(false);
-      onTicketGenerated(createdTicket || newTicket);
-      })
-      .catch(() => {
-        setIsVerifying(false);
-        setVerificationError('This verification link is invalid or expired. Please request a new link.');
-      });
+    }
   };
 
   return (
