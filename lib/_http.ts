@@ -5,17 +5,25 @@ export async function jsonBody(request: any) {
   }
   // Handle ReadableStream (Vercel serverless)
   if (request.body && typeof request.body.getReader === 'function') {
-    const reader = request.body.getReader();
-    const chunks = [];
-    let done = false;
-    while (!done) {
-      const { value, done: readerDone } = await reader.read();
-      done = readerDone;
-      if (value) chunks.push(value);
+    try {
+      const reader = request.body.getReader();
+      const chunks = [];
+      let done = false;
+      while (!done) {
+        const { value, done: readerDone } = await reader.read();
+        done = readerDone;
+        if (value) chunks.push(Buffer.from(value));
+      }
+      const buffer = Buffer.concat(chunks);
+      const text = buffer.toString('utf-8');
+      try { return JSON.parse(text); } catch { return {}; }
+    } catch {
+      return {};
     }
-    const buffer = Buffer.concat(chunks.map(c => Buffer.from(c)));
-    const text = buffer.toString('utf-8');
-    try { return JSON.parse(text); } catch { return {}; }
+  }
+  // Handle Buffer directly
+  if (Buffer.isBuffer(request.body)) {
+    try { return JSON.parse(request.body.toString('utf-8')); } catch { return {}; }
   }
   return {};
 }
