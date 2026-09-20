@@ -1,5 +1,5 @@
-import { firestore } from '../lib/_firebaseAdmin.js';
-import { jsonBody, methodNotAllowed } from '../lib/_http.js';
+import { firestore } from './_firebaseAdmin.js';
+import { jsonBody, methodNotAllowed } from './_http.js';
 
 export default async function handler(request: any, response: any) {
   if (request.method !== 'POST') return methodNotAllowed(response, ['POST']);
