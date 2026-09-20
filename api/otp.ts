@@ -48,8 +48,51 @@ export default async function handler(request: any, response: any) {
       return methodNotAllowed(response, ['POST']);
     }
 
-    const body = await jsonBody(request);
-    console.log('OTP handler: request body', JSON.stringify(body), 'keys:', Object.keys(body));
+    // Try multiple ways to get the body
+    let body: any = {};
+    
+    // 1. Direct body
+    if (request.body && typeof request.body === 'object') {
+      body = request.body;
+    }
+    // 2. String body
+    else if (typeof request.body === 'string') {
+      try { body = JSON.parse(request.body); } catch { body = {}; }
+    }
+    // 3. Buffer body
+    else if (Buffer.isBuffer(request.body)) {
+      try { body = JSON.parse(request.body.toString('utf-8')); } catch { body = {}; }
+    }
+    // 4. ReadableStream
+    else if (request.body && typeof request.body.getReader === 'function') {
+      try {
+        const reader = request.body.getReader();
+        const chunks = [];
+        let done = false;
+        while (!done) {
+          const { value, done: readerDone } = await reader.read();
+          done = readerDone;
+          if (value) chunks.push(Buffer.from(value));
+        }
+        const buffer = Buffer.concat(chunks);
+        const text = buffer.toString('utf-8');
+        try { body = JSON.parse(text); } catch { body = {}; }
+      } catch { body = {}; }
+    }
+    // 5. Vercel's request.rawBody
+    else if (request.rawBody) {
+      try { body = JSON.parse(request.rawBody.toString('utf-8')); } catch { body = {}; }
+    }
+    // 6. Try request.json() if available
+    else if (typeof request.json === 'function') {
+      try { body = await request.json(); } catch { body = {}; }
+    }
+    // 7. Fallback: empty object
+    else {
+      body = {};
+    }
+
+    console.log('OTP handler: parsed body', JSON.stringify(body), 'keys:', Object.keys(body));
 
     if (isSend) {
       const { email, purpose = 'registration' } = body;
