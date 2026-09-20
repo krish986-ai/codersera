@@ -1,4 +1,4 @@
-import { jsonBody, methodNotAllowed } from '../lib/_http.js';
+import { methodNotAllowed } from '../lib/_http.js';
 import { firestore } from '../lib/_firebaseAdmin.js';
 import nodemailer from 'nodemailer';
 
