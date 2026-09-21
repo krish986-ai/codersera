@@ -55,6 +55,16 @@ export const TicketBadge: React.FC<TicketBadgeProps> = ({ ticket, onBack, showBa
     setTilt({ x: 0, y: 0 });
   };
 
+  const downloadQrCode = () => {
+    if (!qrSrc) return;
+    const a = document.createElement('a');
+    a.href = qrSrc;
+    a.download = `codersera-pass-qr-${ticket.id}.png`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+  };
+
   const copyTicketId = () => {
     navigator.clipboard.writeText(ticket.id);
     setCopied(true);
@@ -123,6 +133,16 @@ END:VCALENDAR`;
           >
             <Calendar className="w-3.5 h-3.5 text-sky-400" />
             <span className="hidden sm:inline">Add to Calendar</span>
+          </button>
+
+          <button
+            id="ticket-download-qr-btn"
+            onClick={downloadQrCode}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900 border border-slate-800 text-xs text-slate-300 hover:border-cyan-500/50 hover:text-cyan-300 transition-all font-mono"
+            title="Download Pass QR Code"
+          >
+            <Download className="w-3.5 h-3.5 text-cyan-400" />
+            <span className="hidden sm:inline">Save QR</span>
           </button>
 
           <button

@@ -4,7 +4,7 @@ import { methodNotAllowed } from '../_http.js';
 export default async function handler(request: any, response: any) {
   if (request.method !== 'GET') return methodNotAllowed(response, ['GET']);
   const query = String(request.query?.q || '').trim().toLowerCase();
-  if (query.length < 3 || query.length > 120) return response.status(400).json({ error: 'Enter a valid lookup value.' });
+  if (query.length < 1 || query.length > 120) return response.status(400).json({ error: 'Enter a valid lookup value.' });
   try {
     const db = firestore();
     const [id, email, roll] = await Promise.all([

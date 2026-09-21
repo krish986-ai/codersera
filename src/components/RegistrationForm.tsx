@@ -11,6 +11,7 @@ import {
 import {
   completeRegistrationEmailLink,
   sendRegistrationEmailLink,
+  isEmailVerificationConfigured,
 } from '../lib/firebaseConfig';
 
 interface RegistrationFormProps {
@@ -77,6 +78,10 @@ export const RegistrationForm: React.FC<RegistrationFormProps> = ({
   const [verificationSent, setVerificationSent] = useState(false);
   const [verificationError, setVerificationError] = useState('');
   const [isVerifying, setIsVerifying] = useState(false);
+  const [isEmailVerifiedLocally, setIsEmailVerifiedLocally] = useState(false);
+  const [showDirectIssue, setShowDirectIssue] = useState(false);
+  const [resending, setResending] = useState(false);
+  const [resendStatus, setResendStatus] = useState('');
 
   // GDPR consent
   const [gdprConsent, setGdprConsent] = useState(false);
@@ -84,42 +89,62 @@ export const RegistrationForm: React.FC<RegistrationFormProps> = ({
   const [duplicateTicketFound, setDuplicateTicketFound] = useState<StudentTicket | null>(null);
 
   const issueTicket = async () => {
-    const existing = await findExistingTicket(email, rollNumber, selectedEvent.id);
-    if (existing) {
-      setDuplicateTicketFound(existing);
-      throw new Error('A ticket was already generated for this user.');
-    }
+    setIsVerifying(true);
+    setGeneralError('');
+    setVerificationError('');
+    try {
+      const existing = await findExistingTicket(email, rollNumber, selectedEvent.id);
+      if (existing) {
+        setDuplicateTicketFound(existing);
+        throw new Error('A ticket was already generated for this user.');
+      }
 
-    const newTicketId = generateUniqueTicketId();
-    const qrPayload = `${newTicketId}|${email.trim().toLowerCase()}|${rollNumber.trim().toUpperCase()}|${selectedEvent.id}`;
-    const newTicket: StudentTicket = {
-      id: newTicketId,
-      eventId: selectedEvent.id,
-      eventTitle: selectedEvent.title,
-      fullName: fullName.trim(),
-      email: email.trim().toLowerCase(),
-      rollNumber: rollNumber.trim().toUpperCase(),
-      collegeName: collegeName.trim() || undefined,
-      branch,
-      year,
-      phoneNumber: phoneNumber.trim(),
-      githubUrl: githubUrl.trim() || undefined,
-      linkedinUrl: linkedinUrl.trim() || undefined,
-      photoBase64,
-      isVerified: true,
-      checkedIn: false,
-      createdAt: new Date().toISOString(),
-      qrPayload,
-      gdprConsent: true,
-    };
-    const createdTicket = await saveTickets([newTicket]);
-    window.sessionStorage.removeItem(registrationDraftKey);
-    window.sessionStorage.removeItem('codersera_email_verified');
-    onTicketGenerated(createdTicket || newTicket);
+      const newTicketId = generateUniqueTicketId();
+      const cleanEmail = email.trim().toLowerCase();
+      const cleanRoll = rollNumber.trim().toUpperCase();
+      const qrPayload = `${newTicketId}|${cleanEmail}|${cleanRoll}|${selectedEvent.id}`;
+      const newTicket: StudentTicket = {
+        id: newTicketId,
+        eventId: selectedEvent.id,
+        eventTitle: selectedEvent.title,
+        fullName: fullName.trim(),
+        email: cleanEmail,
+        rollNumber: cleanRoll,
+        collegeName: collegeName.trim() || undefined,
+        branch,
+        year,
+        phoneNumber: phoneNumber.trim(),
+        githubUrl: githubUrl.trim() || undefined,
+        linkedinUrl: linkedinUrl.trim() || undefined,
+        photoBase64,
+        isVerified: true,
+        checkedIn: false,
+        createdAt: new Date().toISOString(),
+        qrPayload,
+        gdprConsent: true,
+      };
+      const createdTicket = await saveTickets([newTicket]);
+      window.sessionStorage.removeItem(registrationDraftKey);
+      window.localStorage.removeItem(registrationDraftKey);
+      window.sessionStorage.removeItem('codersera_pending_email');
+      window.localStorage.removeItem('codersera_pending_email');
+      window.sessionStorage.removeItem('codersera_email_verified');
+      window.localStorage.removeItem('codersera_email_verified');
+      onTicketGenerated(createdTicket || newTicket);
+    } catch (err: any) {
+      if (err?.message?.includes('already exists') || err?.message?.includes('already generated')) {
+        const existing = await findExistingTicket(email, rollNumber, selectedEvent.id);
+        if (existing) setDuplicateTicketFound(existing);
+      }
+      throw err;
+    } finally {
+      setIsVerifying(false);
+    }
   };
 
   React.useEffect(() => {
-    const savedDraft = window.sessionStorage.getItem(registrationDraftKey);
+    const savedDraft = window.sessionStorage.getItem(registrationDraftKey)
+      || window.localStorage.getItem(registrationDraftKey);
     if (savedDraft) {
       try {
         const draft = JSON.parse(savedDraft) as Partial<{
@@ -150,6 +175,7 @@ export const RegistrationForm: React.FC<RegistrationFormProps> = ({
         setGdprConsent(Boolean(draft.gdprConsent));
       } catch {
         window.sessionStorage.removeItem(registrationDraftKey);
+        window.localStorage.removeItem(registrationDraftKey);
       }
     }
 
@@ -161,7 +187,10 @@ export const RegistrationForm: React.FC<RegistrationFormProps> = ({
       .then((verified) => {
         if (verified) {
           setEmail(pendingEmail);
-          window.sessionStorage.setItem('codersera_email_verified', pendingEmail.toLowerCase());
+          const normalized = pendingEmail.toLowerCase();
+          window.sessionStorage.setItem('codersera_email_verified', normalized);
+          window.localStorage.setItem('codersera_email_verified', normalized);
+          setIsEmailVerifiedLocally(true);
           setVerificationSent(true);
           setStep('verify-email');
           setVerificationError('');
@@ -169,6 +198,30 @@ export const RegistrationForm: React.FC<RegistrationFormProps> = ({
       })
       .catch(() => setVerificationError('This verification link is invalid or expired. Please request a new link.'));
   }, [registrationDraftKey]);
+
+  // Synchronize cross-tab email verification
+  React.useEffect(() => {
+    const checkVerification = () => {
+      const targetEmail = (email || window.localStorage.getItem('codersera_pending_email') || '').trim().toLowerCase();
+      if (!targetEmail) return;
+      const v1 = window.localStorage.getItem('codersera_email_verified');
+      const v2 = window.sessionStorage.getItem('codersera_email_verified');
+      if ((v1 && v1.toLowerCase() === targetEmail) || (v2 && v2.toLowerCase() === targetEmail)) {
+        setIsEmailVerifiedLocally(true);
+        setVerificationError('');
+      }
+    };
+    checkVerification();
+    const handleStorage = (e: StorageEvent) => {
+      if (e.key === 'codersera_email_verified') checkVerification();
+    };
+    window.addEventListener('storage', handleStorage);
+    const interval = setInterval(checkVerification, 1500);
+    return () => {
+      window.removeEventListener('storage', handleStorage);
+      clearInterval(interval);
+    };
+  }, [email]);
 
   // Handle Photo Upload with strictly <= 1.00 MB validation
   const handlePhotoSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -208,6 +261,7 @@ export const RegistrationForm: React.FC<RegistrationFormProps> = ({
     e.preventDefault();
     setGeneralError('');
     setDuplicateTicketFound(null);
+    setShowDirectIssue(false);
 
     // Validation checks
     if (!fullName.trim() || !email.trim() || !rollNumber.trim() || !phoneNumber.trim()) {
@@ -216,7 +270,7 @@ export const RegistrationForm: React.FC<RegistrationFormProps> = ({
     }
 
     if (!photoBase64) {
-      setGeneralError('Please upload your photo for your student event badge.');
+      setPhotoError('Please upload your photo for your student event badge.');
       return;
     }
 
@@ -233,11 +287,24 @@ export const RegistrationForm: React.FC<RegistrationFormProps> = ({
       return;
     }
 
-    window.sessionStorage.setItem(registrationDraftKey, JSON.stringify({
-      fullName, email: email.trim().toLowerCase(), rollNumber, collegeName, branch, year,
-      phoneNumber, githubUrl, linkedinUrl, photoBase64, photoSizeKb, gdprConsent,
-    }));
+    const draft = {
+      fullName, email: email.trim().toLowerCase(), rollNumber: rollNumber.trim().toUpperCase(),
+      collegeName, branch, year, phoneNumber, githubUrl, linkedinUrl, photoBase64, photoSizeKb, gdprConsent,
+    };
+    window.sessionStorage.setItem(registrationDraftKey, JSON.stringify(draft));
+    window.localStorage.setItem(registrationDraftKey, JSON.stringify(draft));
     window.sessionStorage.setItem('codersera_pending_email', email.trim().toLowerCase());
+    window.localStorage.setItem('codersera_pending_email', email.trim().toLowerCase());
+
+    if (!isEmailVerificationConfigured()) {
+      try {
+        await issueTicket();
+        return;
+      } catch (err: unknown) {
+        setGeneralError(err instanceof Error ? err.message : 'Unable to issue pass.');
+        return;
+      }
+    }
 
     try {
       await sendRegistrationEmailLink(email.trim().toLowerCase());
@@ -245,6 +312,7 @@ export const RegistrationForm: React.FC<RegistrationFormProps> = ({
       setStep('verify-email');
     } catch (error: unknown) {
       setGeneralError(emailVerificationError(error));
+      setShowDirectIssue(true);
     }
   };
 
@@ -258,18 +326,37 @@ export const RegistrationForm: React.FC<RegistrationFormProps> = ({
       || window.localStorage.getItem('codersera_pending_email')
       || email.trim().toLowerCase();
     try {
-      const verifiedEmail = window.sessionStorage.getItem('codersera_email_verified');
-      const verified = verifiedEmail === pendingEmail.toLowerCase()
+      const verifiedEmail = window.sessionStorage.getItem('codersera_email_verified')
+        || window.localStorage.getItem('codersera_email_verified');
+      const verified = isEmailVerifiedLocally
+        || (verifiedEmail && verifiedEmail.toLowerCase() === pendingEmail.toLowerCase())
         || await completeRegistrationEmailLink(pendingEmail);
       if (!verified) {
-        setVerificationError('Open the verification link sent to your inbox before continuing.');
+        setVerificationError('Open the verification link sent to your inbox before continuing, or click "Directly Issue Pass" below.');
+        setShowDirectIssue(true);
         return;
       }
       await issueTicket();
     } catch (error: unknown) {
       setVerificationError(error instanceof Error ? error.message : 'This verification link is invalid or expired. Please request a new link.');
+      setShowDirectIssue(true);
     } finally {
       setIsVerifying(false);
+    }
+  };
+
+  const handleResendEmail = async () => {
+    const targetEmail = (email || window.localStorage.getItem('codersera_pending_email') || '').trim().toLowerCase();
+    if (!targetEmail) return;
+    setResending(true);
+    setResendStatus('');
+    try {
+      await sendRegistrationEmailLink(targetEmail);
+      setResendStatus('A fresh verification link has been sent to your email.');
+    } catch (err: unknown) {
+      setResendStatus(emailVerificationError(err));
+    } finally {
+      setResending(false);
     }
   };
 
@@ -327,9 +414,29 @@ export const RegistrationForm: React.FC<RegistrationFormProps> = ({
       )}
 
       {generalError && !duplicateTicketFound && (
-        <div className="mb-6 p-4 rounded-xl bg-red-950/40 border border-red-500/50 text-red-200 text-xs font-mono flex items-center gap-2">
-          <AlertCircle className="w-4 h-4 text-red-400 shrink-0" />
-          <span>{generalError}</span>
+        <div className="mb-6 p-4 rounded-xl bg-red-950/40 border border-red-500/50 text-red-200 text-xs font-mono space-y-3">
+          <div className="flex items-center gap-2">
+            <AlertCircle className="w-4 h-4 text-red-400 shrink-0" />
+            <span>{generalError}</span>
+          </div>
+          {showDirectIssue && (
+            <div className="pt-2 border-t border-red-500/30 flex items-center justify-between gap-3">
+              <span className="text-[11px] text-slate-300">You can also bypass email check and generate your pass directly:</span>
+              <button
+                type="button"
+                onClick={async () => {
+                  try {
+                    await issueTicket();
+                  } catch (err: unknown) {
+                    setGeneralError(err instanceof Error ? err.message : 'Unable to issue pass.');
+                  }
+                }}
+                className="px-3 py-1.5 rounded-lg bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold text-xs font-mono shrink-0 shadow-md transition-all"
+              >
+                Issue Pass Directly
+              </button>
+            </div>
+          )}
         </div>
       )}
 
@@ -623,18 +730,33 @@ export const RegistrationForm: React.FC<RegistrationFormProps> = ({
               We sent a secure verification link to <strong className="text-cyan-300 font-mono">{email}</strong>.
             </p>
 
-            <div className="my-5 p-4 rounded-xl bg-[#18181b] border border-dashed border-cyan-500/40">
-              <span className="text-[10px] uppercase font-mono text-slate-400 block mb-1">
-                Verification link sent
-              </span>
-              <span className="text-[10px] text-slate-500 font-mono block mt-1">
-                Open the link in your inbox, then return here to issue your badge.
-              </span>
-            </div>
+            {isEmailVerifiedLocally ? (
+              <div className="my-5 p-4 rounded-xl bg-emerald-950/40 border border-emerald-500/50 text-emerald-200">
+                <div className="flex items-center justify-center gap-2 font-mono text-xs text-emerald-300">
+                  <CheckCircle className="w-4 h-4 text-emerald-400" />
+                  <span>Email verified! Ready to generate your event pass.</span>
+                </div>
+              </div>
+            ) : (
+              <div className="my-5 p-4 rounded-xl bg-[#18181b] border border-dashed border-cyan-500/40">
+                <span className="text-[10px] uppercase font-mono text-slate-400 block mb-1">
+                  Verification link sent
+                </span>
+                <span className="text-[10px] text-slate-500 font-mono block mt-1">
+                  Open the link in your inbox (or any tab), then return here to issue your badge.
+                </span>
+              </div>
+            )}
 
             {verificationError && (
               <div className="mb-4 p-3 rounded-lg bg-red-950/60 border border-red-500 text-red-200 text-xs font-mono">
                 {verificationError}
+              </div>
+            )}
+
+            {resendStatus && (
+              <div className="mb-4 p-2 rounded-lg bg-cyan-950/50 border border-cyan-500/30 text-cyan-300 text-xs font-mono">
+                {resendStatus}
               </div>
             )}
 
@@ -651,7 +773,7 @@ export const RegistrationForm: React.FC<RegistrationFormProps> = ({
                 <button
                   id="confirm-ticket-generation-btn"
                   type="submit"
-                  disabled={isVerifying || !verificationSent}
+                  disabled={isVerifying}
                   className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl bg-cyan-500 hover:bg-cyan-400 disabled:opacity-50 text-slate-950 font-bold text-xs shadow-[0_0_20px_rgba(56,189,248,0.25)] transition-all font-mono"
                 >
                   {isVerifying ? (
@@ -668,6 +790,31 @@ export const RegistrationForm: React.FC<RegistrationFormProps> = ({
                 </button>
               </div>
             </form>
+
+            <div className="mt-5 pt-4 border-t border-[#27272a] flex flex-col items-center gap-2.5">
+              <button
+                type="button"
+                disabled={resending}
+                onClick={handleResendEmail}
+                className="text-xs text-cyan-400 hover:text-cyan-300 underline font-mono"
+              >
+                {resending ? 'Sending new link...' : 'Resend verification email'}
+              </button>
+
+              <button
+                type="button"
+                onClick={async () => {
+                  try {
+                    await issueTicket();
+                  } catch (err: unknown) {
+                    setVerificationError(err instanceof Error ? err.message : 'Unable to issue pass.');
+                  }
+                }}
+                className="text-xs text-slate-400 hover:text-white underline font-mono pt-1"
+              >
+                Didn't receive email? Issue pass directly
+              </button>
+            </div>
           </div>
         </div>
       )}

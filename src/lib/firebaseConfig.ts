@@ -134,6 +134,11 @@ export function getFirebaseInstance(overrideConfig?: FirebaseCustomConfig | null
   return { app: null, auth: null, isConfigured: false };
 }
 
+export function isEmailVerificationConfigured(): boolean {
+  const { auth, isConfigured } = getFirebaseInstance();
+  return Boolean(auth && isConfigured);
+}
+
 export async function sendRegistrationEmailLink(email: string): Promise<boolean> {
   const { auth } = getFirebaseInstance();
   if (!auth) throw new Error('Firebase email verification is not configured.');
@@ -153,8 +158,11 @@ export async function completeRegistrationEmailLink(email: string): Promise<bool
   if (!auth || !isSignInWithEmailLink(auth, window.location.href)) return false;
 
   await signInWithEmailLink(auth, email, window.location.href);
+  const normalized = email.trim().toLowerCase();
   window.sessionStorage.removeItem('codersera_pending_email');
   window.localStorage.removeItem('codersera_pending_email');
+  window.localStorage.setItem('codersera_email_verified', normalized);
+  window.sessionStorage.setItem('codersera_email_verified', normalized);
   window.history.replaceState({}, document.title, window.location.pathname);
   return true;
 }

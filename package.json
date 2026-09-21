@@ -1,15 +1,12 @@
 {
-  "name": "react-example",
+  "name": "codersera",
   "private": true,
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "concurrently --kill-others-on-fail \"npm run auth\" \"wait-on http://localhost:3001/api/auth/session && vite --port=3000 --strictPort --host=0.0.0.0\"",
-    "auth": "tsx server.ts",
-    "dev:full": "npm run dev",
-    "build": "vite build",
-    "preview": "vite preview",
-    "clean": "rm -rf dist server.js",
+    "dev": "tsx server.ts",
+    "build": "vite build && esbuild server.ts --bundle --platform=node --format=cjs --packages=external --sourcemap --outfile=dist/server.cjs",
+    "start": "node dist/server.cjs",
     "lint": "tsc --noEmit"
   },
   "dependencies": {

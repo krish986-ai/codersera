@@ -1,6 +1,6 @@
 {
   "name": "CodersEra",
   "description": "Official ticket generation, digital badge passes, and developer community event management platform by CodersEra.",
-  "requestFramePermissions": [],
+  "requestFramePermissions": ["camera"],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

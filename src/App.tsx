@@ -10,7 +10,7 @@ import { CommunityModal } from './components/CommunityModal';
 import { InfoSectionModal, InfoModalType } from './components/InfoSectionModal';
 import { NotificationToast, ToastMessage } from './components/NotificationToast';
 import { CommunityEvent, StudentTicket } from './types';
-import { getStoredEvents } from './lib/storage';
+import { getStoredEvents, getAdminToken, setAdminToken } from './lib/storage';
 import { ShieldCheck, Heart, Github, ExternalLink, Sparkles, ArrowLeft } from 'lucide-react';
 import { CodersEraLogo } from './components/CodersEraLogo';
 
@@ -51,7 +51,18 @@ export default function App() {
 
   // Sync events whenever view changes
   useEffect(() => {
-    getStoredEvents().then(setEvents).catch((error: unknown) => {
+    getStoredEvents().then((evts) => {
+      setEvents(evts);
+      setSelectedEvent((prev) => {
+        if (prev) return evts.find((e) => e.id === prev.id) || prev;
+        const pendingId = localStorage.getItem('codersera_pending_event_id');
+        if (pendingId) {
+          const match = evts.find((e) => e.id === pendingId);
+          if (match) return match;
+        }
+        return evts[0] || null;
+      });
+    }).catch((error: unknown) => {
       setEventsError(error instanceof Error ? error.message : 'Unable to load events.');
     });
   }, [currentView]);
@@ -60,7 +71,11 @@ export default function App() {
   const [authChecked, setAuthChecked] = useState(false);
 
   useEffect(() => {
-    fetch('/api/auth/session', { credentials: 'include' })
+    const token = getAdminToken();
+    fetch('/api/auth/session', {
+      credentials: 'include',
+      headers: token ? { Authorization: `Bearer ${token}`, 'X-Admin-Token': token } : {},
+    })
       .then((response) => response.ok ? response.json() : { authenticated: false })
       .then((result: { authenticated?: boolean }) => setAdminAuthenticated(result.authenticated === true))
       .catch(() => setAdminAuthenticated(false))
@@ -117,6 +132,7 @@ export default function App() {
   };
 
   const handleAdminLogout = async () => {
+    setAdminToken(null);
     await fetch('/api/auth/logout', { method: 'POST', credentials: 'include' }).catch(() => undefined);
     setAdminAuthenticated(false);
     navigateTo('user-events', true);
@@ -158,13 +174,26 @@ export default function App() {
           <EventList events={events} onSelectEvent={handleSelectEvent} onGoToLookup={() => navigateTo('user-lookup')} />
         )}
 
-        {currentView === 'user-register' && selectedEvent && (
-          <RegistrationForm
-            selectedEvent={selectedEvent}
-            onTicketGenerated={handleTicketGenerated}
-            onViewExistingTicket={handleViewExistingTicket}
-            onCancel={() => navigateTo('user-events')}
-          />
+        {currentView === 'user-register' && (
+          selectedEvent ? (
+            <RegistrationForm
+              selectedEvent={selectedEvent}
+              onTicketGenerated={handleTicketGenerated}
+              onViewExistingTicket={handleViewExistingTicket}
+              onCancel={() => navigateTo('user-events')}
+            />
+          ) : events.length > 0 ? (
+            <RegistrationForm
+              selectedEvent={events[0]}
+              onTicketGenerated={handleTicketGenerated}
+              onViewExistingTicket={handleViewExistingTicket}
+              onCancel={() => navigateTo('user-events')}
+            />
+          ) : (
+            <div className="max-w-md mx-auto py-16 px-4 text-center text-sm text-slate-400 font-mono">
+              Loading event details…
+            </div>
+          )
         )}
 
         {currentView === 'user-ticket' && activeTicket && (

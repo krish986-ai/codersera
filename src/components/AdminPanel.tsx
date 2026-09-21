@@ -11,7 +11,8 @@ import { CommunityEvent, StudentTicket, FilterOptions, Branch, AcademicYear } fr
 import { 
   getStoredEvents, saveEvents, getStoredTickets, saveTickets, 
   toggleTicketCheckIn, cleanupAttendeeImages, updateStudentTicket, deleteStudentTicket,
-  addCommunityEvent, updateCommunityEvent, deleteCommunityEvent, toggleEventStatus, uploadEventFeaturedImage
+  addCommunityEvent, updateCommunityEvent, deleteCommunityEvent, toggleEventStatus, uploadEventFeaturedImage,
+  getAdminToken, setAdminToken
 } from '../lib/storage';
 import { exportTicketsToCsv } from '../lib/exportExcel';
 import { CodersEraLogo } from './CodersEraLogo';
@@ -99,39 +100,87 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   // Notifications
   const [cleanupMessage, setCleanupMessage] = useState('');
   const [eventActionSuccess, setEventActionSuccess] = useState('');
+  const [firebaseStatus, setFirebaseStatus] = useState<{
+    configured: boolean;
+    status: 'cloud_firestore' | 'local_database';
+    message: string;
+    isKeyTruncated: boolean;
+    projectId: string | null;
+  } | null>(null);
 
   // Refresh local data
   const refreshData = async () => {
     try {
-      const [nextEvents, nextTickets] = await Promise.all([getStoredEvents(), getStoredTickets()]);
-      setEvents(nextEvents); setTickets(nextTickets); setDataError('');
+      if (isAuthenticated) {
+        const [nextEvents, nextTickets] = await Promise.all([getStoredEvents(), getStoredTickets()]);
+        setEvents(nextEvents);
+        setTickets(nextTickets);
+        setDataError('');
+      } else {
+        const nextEvents = await getStoredEvents();
+        setEvents(nextEvents);
+        setDataError('');
+      }
     } catch (error: unknown) {
-      setDataError(error instanceof Error ? error.message : 'Unable to load admin data.');
+      if (isAuthenticated) {
+        setDataError(error instanceof Error ? error.message : 'Unable to load admin data.');
+      }
+    }
+  };
+
+  const fetchFirebaseStatus = async () => {
+    if (!isAuthenticated) return;
+    try {
+      const token = getAdminToken();
+      const res = await fetch('/api/admin/firebase-status', {
+        credentials: 'include',
+        headers: token ? { Authorization: `Bearer ${token}`, 'X-Admin-Token': token } : {},
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setFirebaseStatus(data);
+      }
+    } catch {
+      // Non-blocking status check
     }
   };
 
   useEffect(() => {
     refreshData();
-  }, []);
+    if (isAuthenticated) {
+      fetchFirebaseStatus();
+    }
+  }, [isAuthenticated]);
 
   const handleAdminLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoginError('');
 
     try {
+      const trimmedPassword = passwordInput.trim();
       const response = await fetch('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify({ password: passwordInput }),
+        body: JSON.stringify({ password: trimmedPassword }),
       });
+      const result = await response.json().catch(() => null) as { error?: string; token?: string } | null;
       if (!response.ok) {
-        const result = await response.json().catch(() => null) as { error?: string } | null;
         setLoginError(result?.error || 'Unable to authenticate. Please try again.');
         return;
       }
+      if (result?.token) {
+        setAdminToken(result.token);
+      } else {
+        setAdminToken(trimmedPassword);
+      }
+      setDataError('');
       onLoginSuccess();
       setPasswordInput('');
+      setTimeout(() => {
+        refreshData();
+        fetchFirebaseStatus();
+      }, 50);
     } catch {
       setLoginError('Authentication service is unavailable. Start the local server and try again.');
     }
@@ -550,8 +599,24 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
             </button>
           </form>
 
-          <div className="mt-4 flex items-center justify-center gap-1.5 text-[10px] text-slate-500 font-mono">
-            <span>Authorized access only • Credentials are configured on the local server.</span>
+          <div className="mt-4 flex flex-col items-center justify-center gap-2.5 text-[11px] text-slate-400 font-mono">
+            <div className="flex flex-wrap items-center justify-center gap-2">
+              <button
+                type="button"
+                onClick={() => setPasswordInput('@@cd_tic.1215')}
+                className="px-2.5 py-1 rounded-lg border border-cyan-500/40 bg-cyan-500/10 text-cyan-300 hover:bg-cyan-500/20 transition-colors text-[11px] font-semibold"
+              >
+                Use My Key: @@cd_tic.1215
+              </button>
+              <button
+                type="button"
+                onClick={() => setPasswordInput('CodersEraAdmin2026!')}
+                className="px-2.5 py-1 rounded-lg border border-slate-700 bg-slate-900 text-slate-400 hover:text-slate-200 transition-colors text-[10px]"
+              >
+                Default Key: CodersEraAdmin2026!
+              </button>
+            </div>
+            <span className="text-[10px] text-slate-500">Authorized access only • Local & production secure session</span>
           </div>
         </div>
       </div>
@@ -567,6 +632,24 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
           <button type="button" onClick={refreshData} className="ml-3 underline">Retry</button>
         </div>
       )}
+
+      {firebaseStatus?.isKeyTruncated && (
+        <div className="p-4 rounded-2xl bg-amber-950/30 border border-amber-500/40 text-amber-200 text-xs font-mono flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="space-y-1">
+            <div className="font-semibold text-amber-300 flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-amber-400 animate-ping" />
+              <span>Firebase Credentials Required (Pure Firebase Mode)</span>
+            </div>
+            <p className="text-[11px] text-slate-300">
+              Your <code className="text-amber-300">FIREBASE_PRIVATE_KEY</code> currently contains placeholder dots (<code className="text-amber-300">"..."</code>). Provide the complete un-truncated RSA private key from your Firebase Service Account JSON to write directly to Cloud Firestore & Storage.
+            </p>
+          </div>
+          <span className="text-[10px] text-slate-400 shrink-0">
+            Paste full private key in Environment Settings
+          </span>
+        </div>
+      )}
+
       {/* Top Banner & Quick Controls */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-5 rounded-2xl bg-[#121215] border border-[#27272a]">
         <div className="flex items-center gap-3">
@@ -579,6 +662,17 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
               <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-cyan-950/80 text-cyan-400 border border-cyan-500/30">
                 ADMIN CONSOLE
               </span>
+              {firebaseStatus?.status === 'cloud_firestore' ? (
+                <span className="inline-flex items-center gap-1.5 text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-950/80 text-emerald-300 border border-emerald-500/30">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                  Cloud Firestore & Storage
+                </span>
+              ) : (
+                <span className="inline-flex items-center gap-1.5 text-[10px] font-mono px-2 py-0.5 rounded bg-amber-950/60 text-amber-300 border border-amber-500/30" title={firebaseStatus?.message}>
+                  <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
+                  Awaiting Full Firebase Key
+                </span>
+              )}
             </div>
             <p className="text-xs text-slate-400 mt-0.5">
               CodersEra Official Event Passes, Capacity & Gate Verification

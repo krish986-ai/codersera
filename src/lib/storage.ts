@@ -5,14 +5,48 @@ export const INITIAL_EVENTS: CommunityEvent[] = [
   { id: 'evt-hackera-2026', title: 'HackEra 2026: 36-Hr Global Hackathon', tagline: 'Code. Ship. Scale. | ₹2,00,000+ Prize Bounty & Investor Track', date: 'October 10-11, 2026', time: '10:00 AM Onwards (Continuous 36-Hr)', venue: 'CodersEra Innovation Lab & Tech Center', category: 'Hackathon', description: 'Premier flagship open-source hackathon of CodersEra.', totalSeats: 300, availableSeats: 82, isActive: true, bannerGradient: 'from-cyan-500/20 via-blue-600/20 to-indigo-600/10', tags: ['Full Stack', 'Web3', 'AI/ML', 'Mobile'], speakers: ['Tech Founders', 'Venture Mentors'] },
   { id: 'evt-devforge-bootcamp', title: 'DevForge: Cloud-Native & DevOps Masterclass', tagline: 'Master Containers, Kubernetes, CI/CD Pipelines & Site Reliability', date: 'November 05, 2026', time: '01:00 PM - 06:00 PM IST', venue: 'Advanced Tech Seminar Hall & Virtual Live Stream', category: 'Bootcamp', description: 'Intensive engineering masterclass on containerization and production observability.', totalSeats: 150, availableSeats: 44, isActive: true, bannerGradient: 'from-sky-500/20 via-cyan-600/20 to-blue-700/10', tags: ['Docker', 'Kubernetes', 'CI/CD', 'Observability'], speakers: ['DevOps Lead @ CloudCorp'] },
 ];
+const ADMIN_TOKEN_STORAGE_KEY = 'codersera_admin_token';
+
+export function getAdminToken(): string | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    return localStorage.getItem(ADMIN_TOKEN_STORAGE_KEY);
+  } catch {
+    return null;
+  }
+}
+
+export function setAdminToken(token: string | null): void {
+  if (typeof window === 'undefined') return;
+  try {
+    if (token) {
+      localStorage.setItem(ADMIN_TOKEN_STORAGE_KEY, token);
+    } else {
+      localStorage.removeItem(ADMIN_TOKEN_STORAGE_KEY);
+    }
+  } catch {}
+}
+
 const request = async (url: string, init?: RequestInit) => {
   let response: Response;
+  const token = getAdminToken();
+  const authHeaders: Record<string, string> = token
+    ? {
+        Authorization: `Bearer ${token}`,
+        'X-Admin-Token': token,
+      }
+    : {};
+
   try {
     response = await fetch(url, {
       credentials: 'include',
       cache: 'no-store',
       ...init,
-      headers: { 'Content-Type': 'application/json', ...(init?.headers || {}) },
+      headers: {
+        'Content-Type': 'application/json',
+        ...authHeaders,
+        ...(init?.headers || {}),
+      },
     });
   } catch {
     throw new Error(`Unable to reach ${url}. Check your connection and try again.`);
@@ -38,11 +72,20 @@ export async function saveTickets(tickets: StudentTicket[]) {
 }
 export function generateUniqueTicketId() { return `CE-${new Date().getFullYear()}-${crypto.randomUUID().replace(/-/g, '').slice(0, 12).toUpperCase()}`; }
 export async function findExistingTicket(email: string, rollNumber: string, eventId: string) {
-  const tickets = await request(`/api/tickets/lookup?q=${encodeURIComponent(email.trim().toLowerCase())}`) as StudentTicket[];
-  const rollMatches = await request(`/api/tickets/lookup?q=${encodeURIComponent(rollNumber.trim().toUpperCase())}`) as StudentTicket[];
-  return [...tickets, ...rollMatches].find(t => t.eventId === eventId) || null;
+  try {
+    const tickets = (await request(`/api/tickets/lookup?q=${encodeURIComponent(email.trim().toLowerCase())}`).catch(() => [])) as StudentTicket[];
+    const rollMatches = (await request(`/api/tickets/lookup?q=${encodeURIComponent(rollNumber.trim().toUpperCase())}`).catch(() => [])) as StudentTicket[];
+    const all = [...(Array.isArray(tickets) ? tickets : []), ...(Array.isArray(rollMatches) ? rollMatches : [])];
+    return all.find(t => t && t.eventId === eventId) || null;
+  } catch {
+    return null;
+  }
 }
-export async function findTicketsByEmail(email: string) { return request(`/api/tickets/lookup?q=${encodeURIComponent(email.trim().toLowerCase())}`); }
+export async function findTicketsByEmail(query: string) {
+  const q = String(query || '').trim();
+  if (!q) return [];
+  return request(`/api/tickets/lookup?q=${encodeURIComponent(q.toLowerCase())}`);
+}
 export async function addCommunityEvent(eventData: Omit<CommunityEvent, 'id'> & { id?: string }) {
   const event = { ...eventData, id: eventData.id || `evt-${crypto.randomUUID().slice(0, 12)}`, totalSeats: Number(eventData.totalSeats) || 100, availableSeats: Number(eventData.availableSeats) || Number(eventData.totalSeats) || 100, generatedPasses: eventData.generatedPasses ?? 0, isActive: eventData.isActive ?? true, isFeatured: eventData.isFeatured ?? false };
   return request('/api/admin/events', json({ event }));
