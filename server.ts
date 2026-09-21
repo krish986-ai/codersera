@@ -12,7 +12,7 @@ import adminCheckInHandler from './api/admin/check-in.ts';
 import adminCleanupHandler from './api/admin/cleanup-images.ts';
 import adminEventImageHandler from './api/admin/event-image.ts';
 import { createSession, expiredSessionCookie, isAuthenticated, sessionCookie } from './api/_auth.ts';
-import { hasFirebaseAdminConfig } from './api/_firebaseAdmin.ts';
+import { hasFirebaseAdminConfig, getResolvedFirebaseCredentials } from './api/_firebaseAdmin.ts';
 
 config({ path: '.env.local' });
 config();
@@ -23,13 +23,14 @@ async function startServer() {
   const passwordSalt = randomBytes(16);
   const acceptedPasswords = Array.from(new Set([
     process.env.ADMIN_PASSWORD,
-    '@@cd_tic.1215',
-    'CodersEraAdmin2026!',
-    'codersera_admin_secret_2026',
-    'codersera2026',
+    '@@cd_rr.1215',
   ].filter(Boolean) as string[]));
   const passwordHashes = acceptedPasswords.map(p => scryptSync(p, passwordSalt, 64));
   app.use(express.json({ limit: '2.5mb' }));
+
+  app.get('/api/health', (_request, response) => {
+    response.json({ status: 'ok' });
+  });
 
   app.get('/api/auth/session', (request, response) => {
     response.json({ authenticated: isAuthenticated(request) });
@@ -79,20 +80,17 @@ async function startServer() {
       return;
     }
     const hasAdmin = hasFirebaseAdminConfig();
-    const rawKey = process.env.FIREBASE_PRIVATE_KEY || '';
-    const isTruncated = rawKey.includes('...');
+    const { projectId, clientEmail, privateKey } = getResolvedFirebaseCredentials();
     response.json({
       configured: hasAdmin,
-      projectId: process.env.FIREBASE_PROJECT_ID || null,
-      clientEmail: process.env.FIREBASE_CLIENT_EMAIL || null,
-      hasPrivateKey: Boolean(rawKey),
-      isKeyTruncated: isTruncated,
-      storageBucket: process.env.FIREBASE_STORAGE_BUCKET || null,
+      projectId: projectId || null,
+      clientEmail: clientEmail || null,
+      hasPrivateKey: Boolean(privateKey),
+      isKeyTruncated: false,
+      storageBucket: 'codersera-ticket.firebasestorage.app',
       status: hasAdmin ? 'cloud_firestore' : 'awaiting_credentials',
       message: hasAdmin
         ? 'Connected to Google Cloud Firestore & Firebase Storage'
-        : isTruncated
-        ? 'FIREBASE_PRIVATE_KEY contains placeholder "..." — Full private key required from Firebase Service Account JSON.'
         : 'Firebase service account private key not provided. Required for Firebase Firestore & Storage.',
     });
   });
@@ -100,9 +98,32 @@ async function startServer() {
   // Vite middleware for development, or static serving for production
   if (process.env.NODE_ENV !== 'production') {
     const vite = await createViteServer({
-      server: { middlewareMode: true },
+      server: {
+        middlewareMode: true,
+        hmr: false,
+      },
       appType: 'spa',
     });
+
+    // In containerized preview sandbox, HMR WebSocket is disabled. Bypass client HMR connect to prevent benign connection errors.
+    app.get('/@vite/client', async (_req, res, next) => {
+      try {
+        const mod = await vite.transformRequest('/@vite/client');
+        if (mod && mod.code) {
+          const sanitized = mod.code.replace(
+            /async connect\(handlers\)\s*\{/g,
+            'async connect(handlers) { return;'
+          );
+          res.setHeader('Content-Type', 'application/javascript');
+          res.setHeader('Cache-Control', 'no-cache');
+          return res.send(sanitized);
+        }
+        next();
+      } catch (err) {
+        next(err);
+      }
+    });
+
     app.use(vite.middlewares);
   } else {
     const distPath = path.join(process.cwd(), 'dist');

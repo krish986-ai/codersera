@@ -42,17 +42,26 @@ export function sanitizeConfigValue(val: string | undefined): string {
     .trim();
 }
 
+const DEFAULT_CLIENT_CONFIG: FirebaseCustomConfig = {
+  apiKey: 'AIzaSyBj1dInDMTLheQKCxe-tp7BIMGyqf9_Gi8',
+  authDomain: 'codersera-ticket.firebaseapp.com',
+  projectId: 'codersera-ticket',
+  storageBucket: 'codersera-ticket.firebasestorage.app',
+  messagingSenderId: '1095751008693',
+  appId: '1:1095751008693:web:939c2b3653d8176ebd19fc',
+};
+
 export function getEnvFirebaseConfig(): FirebaseCustomConfig | null {
-  const apiKey = (import.meta.env.VITE_FIREBASE_API_KEY as string | undefined) || '';
-  const projectId = (import.meta.env.VITE_FIREBASE_PROJECT_ID as string | undefined) || '';
-  if (!apiKey || !projectId) return null;
+  const apiKey = (import.meta.env.VITE_FIREBASE_API_KEY as string | undefined) || DEFAULT_CLIENT_CONFIG.apiKey;
+  const projectId = (import.meta.env.VITE_FIREBASE_PROJECT_ID as string | undefined) || DEFAULT_CLIENT_CONFIG.projectId;
+  if (!apiKey || !projectId) return DEFAULT_CLIENT_CONFIG;
   return {
     apiKey: sanitizeConfigValue(apiKey),
     authDomain: sanitizeConfigValue(import.meta.env.VITE_FIREBASE_AUTH_DOMAIN as string | undefined) || `${projectId}.firebaseapp.com`,
     projectId: sanitizeConfigValue(projectId),
     storageBucket: sanitizeConfigValue(import.meta.env.VITE_FIREBASE_STORAGE_BUCKET as string | undefined) || `${projectId}.firebasestorage.app`,
-    messagingSenderId: sanitizeConfigValue(import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID as string | undefined) || '1234567890',
-    appId: sanitizeConfigValue(import.meta.env.VITE_FIREBASE_APP_ID as string | undefined) || '',
+    messagingSenderId: sanitizeConfigValue(import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID as string | undefined) || DEFAULT_CLIENT_CONFIG.messagingSenderId,
+    appId: sanitizeConfigValue(import.meta.env.VITE_FIREBASE_APP_ID as string | undefined) || DEFAULT_CLIENT_CONFIG.appId,
   };
 }
 

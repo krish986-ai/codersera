@@ -4,10 +4,7 @@ const SESSION_TTL_SECONDS = 8 * 60 * 60;
 
 export const ACCEPTED_PASSWORDS = [
   process.env.ADMIN_PASSWORD,
-  '@@cd_tic.1215',
-  'CodersEraAdmin2026!',
-  'codersera_admin_secret_2026',
-  'codersera2026',
+  '@@cd_rr.1215',
 ].filter(Boolean) as string[];
 
 export function isValidPassword(candidate?: string | null): boolean {

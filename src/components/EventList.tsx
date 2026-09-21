@@ -67,7 +67,7 @@ export const EventList: React.FC<EventListProps> = ({ events, onSelectEvent, onG
 
             {/* Subheading focused purely on ticketing and pass access */}
             <p className="text-slate-400 text-base sm:text-lg max-w-xl leading-relaxed">
-              Official digital credentials for CodersEra campus chapters. Featuring cryptographic anti-duplicate roll locking, interactive holographic badges, and instant gate pass check-in.
+              Official digital credentials for CodersEra hackathons, summits, and tech conclaves. Featuring cryptographic anti-duplicate pass locking, interactive holographic badges, and instant gate pass check-in.
             </p>
 
             {/* Hero CTA buttons */}
@@ -104,7 +104,7 @@ export const EventList: React.FC<EventListProps> = ({ events, onSelectEvent, onG
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-4 border-t border-[#27272a]/60">
               <div className="space-y-0.5">
                 <span className="text-[10px] uppercase font-mono text-slate-500">Security</span>
-                <p className="text-xs font-mono font-bold text-slate-200">Roll No. Locked</p>
+                <p className="text-xs font-mono font-bold text-slate-200">Anti-Duplicate ID</p>
               </div>
               <div className="space-y-0.5">
                 <span className="text-[10px] uppercase font-mono text-slate-500">Pass Type</span>
@@ -115,8 +115,8 @@ export const EventList: React.FC<EventListProps> = ({ events, onSelectEvent, onG
                 <p className="text-xs font-mono font-bold text-emerald-400">1-Second Scan</p>
               </div>
               <div className="space-y-0.5">
-                <span className="text-[10px] uppercase font-mono text-slate-500">Host Chapter</span>
-                <p className="text-xs font-mono font-bold text-slate-200">NIET Campus</p>
+                <span className="text-[10px] uppercase font-mono text-slate-500">Host Network</span>
+                <p className="text-xs font-mono font-bold text-slate-200">CodersEra Official</p>
               </div>
             </div>
 
@@ -227,7 +227,7 @@ export const EventList: React.FC<EventListProps> = ({ events, onSelectEvent, onG
             How CodersEra Event Passes Work.
           </h2>
           <p className="text-slate-400 text-sm max-w-xl leading-relaxed mt-1">
-            A student-first, tamper-resistant access protocol engineered for fast entrance scanning, verified team roles, and fair seat distribution.
+            A developer-first, tamper-resistant access protocol engineered for rapid entrance scanning, verified credentials, and fair seat distribution.
           </p>
         </div>
 
@@ -239,10 +239,10 @@ export const EventList: React.FC<EventListProps> = ({ events, onSelectEvent, onG
               <Code2 className="w-5 h-5" />
             </div>
             <h3 className="text-white font-bold text-lg mb-1.5 group-hover:text-cyan-300 transition-colors font-display">
-              Anti-Duplicate Roll Protection
+              Anti-Duplicate Pass Verification
             </h3>
             <p className="text-slate-400 text-sm leading-relaxed">
-              Each student roll number is strictly bound to one issued ticket, eliminating double claims and ensuring transparent capacity allocation.
+              Each registration ID or attendee email is strictly bound to one issued ticket, eliminating double claims and ensuring transparent capacity allocation.
             </p>
           </div>
 
@@ -281,7 +281,7 @@ export const EventList: React.FC<EventListProps> = ({ events, onSelectEvent, onG
               Offline Wallet & Print Passes
             </h3>
             <p className="text-slate-400 text-sm leading-relaxed">
-              Export badges as high-res PNG images, print official physical conference credentials, or retrieve your pass anytime using your roll number.
+              Export badges as high-res PNG images, print official physical conference credentials, or retrieve your pass anytime using your pass ID or email.
             </p>
           </div>
         </div>
@@ -300,7 +300,7 @@ export const EventList: React.FC<EventListProps> = ({ events, onSelectEvent, onG
               Upcoming Events & Sprints
             </h2>
             <p className="text-xs sm:text-sm text-slate-400 mt-1 max-w-xl">
-              Register for your verified developer access badge with offline QR scanning and anti-duplicate roll validation.
+              Register for your verified developer access badge with instant QR scanning and anti-duplicate registration validation.
             </p>
           </div>
 

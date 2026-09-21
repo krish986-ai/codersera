@@ -6,8 +6,6 @@ import { TicketBadge } from './components/TicketBadge';
 import { TicketLookup } from './components/TicketLookup';
 import { AdminPanel } from './components/AdminPanel';
 import { GdprModal } from './components/GdprModal';
-import { CommunityModal } from './components/CommunityModal';
-import { InfoSectionModal, InfoModalType } from './components/InfoSectionModal';
 import { NotificationToast, ToastMessage } from './components/NotificationToast';
 import { CommunityEvent, StudentTicket } from './types';
 import { getStoredEvents, getAdminToken, setAdminToken } from './lib/storage';
@@ -44,10 +42,6 @@ export default function App() {
     window.addEventListener('popstate', handleBrowserBack);
     return () => window.removeEventListener('popstate', handleBrowserBack);
   }, []);
-
-  // Community & Info modals state
-  const [communityModalOpen, setCommunityModalOpen] = useState(false);
-  const [infoModalType, setInfoModalType] = useState<InfoModalType>(null);
 
   // Sync events whenever view changes
   useEffect(() => {
@@ -147,8 +141,6 @@ export default function App() {
         setCurrentView={navigateTo}
         adminAuthenticated={adminAuthenticated}
         onAdminLogout={handleAdminLogout}
-        onOpenCommunityModal={() => setCommunityModalOpen(true)}
-        onOpenInfoModal={(type) => setInfoModalType(type)}
       />
 
       {/* Main Content View Switcher */}
@@ -294,12 +286,15 @@ export default function App() {
             </p>
 
             <div className="flex flex-wrap items-center gap-4 text-slate-400">
-              <button
-                onClick={() => setCommunityModalOpen(true)}
-                className="text-cyan-400 hover:underline transition-colors"
+              <a
+                href="https://www.codersera.in/"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="hover:text-cyan-400 text-cyan-400 transition-colors flex items-center gap-1"
               >
-                Join Community
-              </button>
+                <span>Main Website (codersera.in)</span>
+                <ExternalLink className="w-3 h-3" />
+              </a>
               <span>•</span>
               <button
                 onClick={() => setGdprModalOpen(true)}
@@ -307,16 +302,6 @@ export default function App() {
               >
                 Privacy & Pass Policy
               </button>
-              <span>•</span>
-              <a
-                href="https://www.codersera.in/"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="hover:text-cyan-400 transition-colors flex items-center gap-1"
-              >
-                <span>codersera.in</span>
-                <ExternalLink className="w-3 h-3" />
-              </a>
               <span>•</span>
               <button
                 onClick={() => navigateTo('admin')}
@@ -334,12 +319,6 @@ export default function App() {
 
       {/* GDPR Modal */}
       <GdprModal isOpen={gdprModalOpen} onClose={() => setGdprModalOpen(false)} />
-
-      {/* Join Community Modal */}
-      <CommunityModal isOpen={communityModalOpen} onClose={() => setCommunityModalOpen(false)} />
-
-      {/* About / Gallery / Team / Contact Info Modal */}
-      <InfoSectionModal type={infoModalType} onClose={() => setInfoModalType(null)} />
     </div>
   );
 }

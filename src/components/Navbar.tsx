@@ -7,20 +7,15 @@ import {
   Menu, 
   X,
   ExternalLink,
-  Ticket,
   Calendar,
   Users
 } from 'lucide-react';
 import { CodersEraLogo } from './CodersEraLogo';
-import { InfoModalType } from './InfoSectionModal';
-
 interface NavbarProps {
   currentView: 'user-events' | 'user-register' | 'user-ticket' | 'user-lookup' | 'admin';
   setCurrentView: (view: 'user-events' | 'user-register' | 'user-ticket' | 'user-lookup' | 'admin') => void;
   adminAuthenticated: boolean;
   onAdminLogout: () => void;
-  onOpenCommunityModal: () => void;
-  onOpenInfoModal: (type: InfoModalType) => void;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
@@ -28,8 +23,6 @@ export const Navbar: React.FC<NavbarProps> = ({
   setCurrentView,
   adminAuthenticated,
   onAdminLogout,
-  onOpenCommunityModal,
-  onOpenInfoModal,
 }) => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [notificationOpen, setNotificationOpen] = useState(false);
@@ -95,15 +88,6 @@ export const Navbar: React.FC<NavbarProps> = ({
               <ExternalLink className="w-3 h-3 opacity-60" />
             </a>
 
-            {/* Community */}
-            <button
-              id="nav-pill-community"
-              onClick={onOpenCommunityModal}
-              className="px-3 py-1.5 rounded-full text-xs font-medium text-slate-400 hover:text-white hover:bg-white/5 transition-colors"
-            >
-              Community
-            </button>
-
             {/* Admin Console */}
             <button
               id="nav-pill-admin"
@@ -139,7 +123,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                 type="button"
                 onClick={() => setNotificationOpen(!notificationOpen)}
                 className="w-9 h-9 rounded-full border border-white/10 bg-[#121215] hover:bg-white/5 flex items-center justify-center text-slate-300 hover:text-white transition-colors shrink-0 relative"
-                title="Community Notifications"
+                title="Portal Notifications"
               >
                 <Bell className="w-4 h-4" />
                 <span className="absolute top-2 right-2 w-2 h-2 rounded-full bg-cyan-400 shadow-[0_0_8px_#38bdf8]" />
@@ -148,19 +132,19 @@ export const Navbar: React.FC<NavbarProps> = ({
               {notificationOpen && (
                 <div className="absolute right-0 mt-2 w-80 p-4 rounded-2xl bg-[#121215] border border-[#27272a] shadow-2xl z-50 text-xs">
                   <div className="flex items-center justify-between pb-2 border-b border-[#27272a] mb-2.5">
-                    <span className="font-bold text-white font-display">Live Announcements</span>
+                    <span className="font-bold text-white font-display">Portal Updates</span>
                     <span className="text-[10px] text-cyan-400 bg-cyan-950/80 px-2 py-0.5 rounded-full font-mono">
-                      Active
+                      Live
                     </span>
                   </div>
                   <p className="text-slate-300 text-xs leading-relaxed">
-                    🚀 <strong>Automate India NIET Chapter 2026</strong> ticket passes are now open! Register your developer badge for Microsoft Azure tracks and workshops.
+                    🚀 <strong>CodersEra 2026 Event Passes</strong> are active. Instant digital badges with QR codes are issued upon registration.
                   </p>
                 </div>
               )}
             </div>
 
-            {/* Official GitHub Link: https://github.com/CodersEraa */}
+            {/* Official GitHub Link */}
             <a
               id="nav-github-link"
               href="https://github.com/CodersEraa"
@@ -171,15 +155,6 @@ export const Navbar: React.FC<NavbarProps> = ({
             >
               <Github className="w-4 h-4" />
             </a>
-
-            {/* Join Community Cyan Button from codersera.in */}
-            <button
-              id="nav-join-community-btn"
-              onClick={onOpenCommunityModal}
-              className="hidden sm:inline-flex items-center justify-center px-4 sm:px-5 py-2 rounded-full bg-[#38bdf8] hover:bg-[#0284c7] text-[#09090b] font-bold text-xs sm:text-sm shadow-[0_0_20px_rgba(56,189,248,0.3)] transition-all hover:scale-105 active:scale-95 shrink-0"
-            >
-              Join Community
-            </button>
 
             {/* Mobile Hamburger Toggle */}
             <button
@@ -201,35 +176,26 @@ export const Navbar: React.FC<NavbarProps> = ({
               }}
               className="w-full text-left px-3 py-2 rounded-lg text-slate-300 hover:text-white hover:bg-white/5"
             >
-              Home / Events
+              Events & Passes
             </button>
             <button
               onClick={() => {
                 setCurrentView('user-lookup');
                 setMobileMenuOpen(false);
               }}
-              className="w-full text-left px-3 py-2 rounded-lg text-slate-300 hover:text-white hover:bg-white/5"
+              className="w-full text-left px-3 py-2 rounded-lg text-cyan-400 hover:bg-white/5 font-semibold"
             >
               Find My Ticket Pass
             </button>
-            <button
-              onClick={() => {
-                onOpenInfoModal('about');
-                setMobileMenuOpen(false);
-              }}
-              className="w-full text-left px-3 py-2 rounded-lg text-slate-300 hover:text-white hover:bg-white/5"
+            <a
+              href="https://www.codersera.in/"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center justify-between w-full px-3 py-2 rounded-lg text-slate-300 hover:text-white hover:bg-white/5"
             >
-              About CodersEra
-            </button>
-            <button
-              onClick={() => {
-                onOpenCommunityModal();
-                setMobileMenuOpen(false);
-              }}
-              className="w-full text-left px-3 py-2 rounded-lg text-cyan-400 hover:bg-white/5"
-            >
-              Join WhatsApp Community
-            </button>
+              <span>Main Website (codersera.in)</span>
+              <ExternalLink className="w-3 h-3 opacity-60" />
+            </a>
             <button
               onClick={() => {
                 setCurrentView('admin');

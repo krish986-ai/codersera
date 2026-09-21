@@ -600,23 +600,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
           </form>
 
           <div className="mt-4 flex flex-col items-center justify-center gap-2.5 text-[11px] text-slate-400 font-mono">
-            <div className="flex flex-wrap items-center justify-center gap-2">
-              <button
-                type="button"
-                onClick={() => setPasswordInput('@@cd_tic.1215')}
-                className="px-2.5 py-1 rounded-lg border border-cyan-500/40 bg-cyan-500/10 text-cyan-300 hover:bg-cyan-500/20 transition-colors text-[11px] font-semibold"
-              >
-                Use My Key: @@cd_tic.1215
-              </button>
-              <button
-                type="button"
-                onClick={() => setPasswordInput('CodersEraAdmin2026!')}
-                className="px-2.5 py-1 rounded-lg border border-slate-700 bg-slate-900 text-slate-400 hover:text-slate-200 transition-colors text-[10px]"
-              >
-                Default Key: CodersEraAdmin2026!
-              </button>
-            </div>
-            <span className="text-[10px] text-slate-500">Authorized access only • Local & production secure session</span>
+            <span className="text-[10px] text-slate-500">Authorized personnel only • Secure encrypted gateway</span>
           </div>
         </div>
       </div>
@@ -668,9 +652,9 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                   Cloud Firestore & Storage
                 </span>
               ) : (
-                <span className="inline-flex items-center gap-1.5 text-[10px] font-mono px-2 py-0.5 rounded bg-amber-950/60 text-amber-300 border border-amber-500/30" title={firebaseStatus?.message}>
-                  <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
-                  Awaiting Full Firebase Key
+                <span className="inline-flex items-center gap-1.5 text-[10px] font-mono px-2 py-0.5 rounded bg-cyan-950/60 text-cyan-300 border border-cyan-500/30" title={firebaseStatus?.message}>
+                  <span className="w-1.5 h-1.5 rounded-full bg-cyan-400" />
+                  Local Database Sync
                 </span>
               )}
             </div>
@@ -769,7 +753,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
           }`}
         >
           <Users className="w-3.5 h-3.5" />
-          <span>Pass Holders Sheet ({filteredTickets.length})</span>
+          <span>Pass Holders & Attendees ({filteredTickets.length})</span>
         </button>
 
         <button
@@ -888,7 +872,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                   <div className="pt-3 border-t border-[#27272a] space-y-3">
                     <div>
                       <div className="flex items-center justify-between text-xs font-mono mb-1">
-                        <span className="text-slate-400">Capacity & Enrolled</span>
+                        <span className="text-slate-400">Capacity & Issued</span>
                         <span className="font-bold text-cyan-400">
                           {enrolledCount} / {evt.totalSeats} ({fillPercentage}%)
                         </span>
@@ -949,7 +933,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                   type="text"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Search by Name, Roll No, Email, or Pass ID..."
+                  placeholder="Search by Name, Reg ID, Email, or Pass ID..."
                   className="w-full pl-9 pr-4 py-2 rounded-xl bg-[#18181b] border border-[#27272a] text-white placeholder:text-slate-500 text-xs font-mono focus:border-cyan-400 focus:outline-none"
                 />
                 <Search className="w-4 h-4 text-slate-500 absolute left-3 top-2.5" />
@@ -1054,7 +1038,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                   <tr className="bg-[#18181b] border-b border-[#27272a] text-slate-400">
                     <th className="py-3 px-4">Pass ID</th>
                     <th className="py-3 px-4">Attendee Name</th>
-                    <th className="py-3 px-4">Attendee / Roll ID</th>
+                    <th className="py-3 px-4">Attendee / Reg ID</th>
                     <th className="py-3 px-4">Track & Stage</th>
                     <th className="py-3 px-4">Event</th>
                     <th className="py-3 px-4 text-center">Status</th>
@@ -1286,7 +1270,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                           <span className="font-bold text-white">{scanResult.ticket.fullName}</span>
                         </div>
                         <div>
-                          <span className="text-slate-400 block text-[10px]">ROLL / ID</span>
+                          <span className="text-slate-400 block text-[10px]">REG / PASS ID</span>
                           <span className="text-cyan-300 font-bold">{scanResult.ticket.rollNumber}</span>
                         </div>
                         <div>
@@ -1570,7 +1554,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-slate-400 mb-1">Attendee / Roll ID</label>
+                  <label className="block text-slate-400 mb-1">Registration / Attendee ID</label>
                   <input
                     type="text"
                     required

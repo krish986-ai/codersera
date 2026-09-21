@@ -15,9 +15,7 @@ export default function handler(request: any, response: any) {
   const configuredPassword = process.env.ADMIN_PASSWORD;
   const acceptedPasswords = Array.from(new Set([
     configuredPassword,
-    'CodersEraAdmin2026!',
-    'codersera_admin_secret_2026',
-    'codersera2026',
+    '@@cd_rr.1215',
   ].filter(Boolean) as string[]));
 
   const password = typeof request.body?.password === 'string' ? request.body.password : '';

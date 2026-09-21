@@ -8,11 +8,6 @@ import { CommunityEvent, StudentTicket, Branch, AcademicYear } from '../types';
 import { 
   findExistingTicket, generateUniqueTicketId, saveTickets
 } from '../lib/storage';
-import {
-  completeRegistrationEmailLink,
-  sendRegistrationEmailLink,
-  isEmailVerificationConfigured,
-} from '../lib/firebaseConfig';
 
 interface RegistrationFormProps {
   selectedEvent: CommunityEvent;
@@ -40,14 +35,6 @@ const YEARS: AcademicYear[] = [
   'Working Professional / Builder',
 ];
 
-function emailVerificationError(error: unknown) {
-  const code = typeof error === 'object' && error && 'code' in error ? String(error.code) : '';
-  if (code === 'auth/quota-exceeded') {
-    return 'Email verification is temporarily unavailable because the daily Firebase email quota has been reached. Please try again after the quota resets, or contact the event team.';
-  }
-  return error instanceof Error ? error.message : 'Unable to send the verification email.';
-}
-
 export const RegistrationForm: React.FC<RegistrationFormProps> = ({
   selectedEvent,
   onTicketGenerated,
@@ -55,8 +42,6 @@ export const RegistrationForm: React.FC<RegistrationFormProps> = ({
   onCancel,
 }) => {
   const registrationDraftKey = `codersera_registration_draft_${selectedEvent.id}`;
-  // Form step: 'details' -> 'verify-email' -> 'completed'
-  const [step, setStep] = useState<'details' | 'verify-email'>('details');
 
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
@@ -74,14 +59,8 @@ export const RegistrationForm: React.FC<RegistrationFormProps> = ({
   const [photoError, setPhotoError] = useState<string>('');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Email-link verification state
-  const [verificationSent, setVerificationSent] = useState(false);
-  const [verificationError, setVerificationError] = useState('');
-  const [isVerifying, setIsVerifying] = useState(false);
-  const [isEmailVerifiedLocally, setIsEmailVerifiedLocally] = useState(false);
-  const [showDirectIssue, setShowDirectIssue] = useState(false);
-  const [resending, setResending] = useState(false);
-  const [resendStatus, setResendStatus] = useState('');
+  // Form submission state
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   // GDPR consent
   const [gdprConsent, setGdprConsent] = useState(false);
@@ -89,9 +68,7 @@ export const RegistrationForm: React.FC<RegistrationFormProps> = ({
   const [duplicateTicketFound, setDuplicateTicketFound] = useState<StudentTicket | null>(null);
 
   const issueTicket = async () => {
-    setIsVerifying(true);
     setGeneralError('');
-    setVerificationError('');
     try {
       const existing = await findExistingTicket(email, rollNumber, selectedEvent.id);
       if (existing) {
@@ -137,8 +114,6 @@ export const RegistrationForm: React.FC<RegistrationFormProps> = ({
         if (existing) setDuplicateTicketFound(existing);
       }
       throw err;
-    } finally {
-      setIsVerifying(false);
     }
   };
 
@@ -178,50 +153,7 @@ export const RegistrationForm: React.FC<RegistrationFormProps> = ({
         window.localStorage.removeItem(registrationDraftKey);
       }
     }
-
-    const pendingEmail = window.sessionStorage.getItem('codersera_pending_email')
-      || window.localStorage.getItem('codersera_pending_email');
-    if (!pendingEmail || !window.location.search) return;
-
-    completeRegistrationEmailLink(pendingEmail)
-      .then((verified) => {
-        if (verified) {
-          setEmail(pendingEmail);
-          const normalized = pendingEmail.toLowerCase();
-          window.sessionStorage.setItem('codersera_email_verified', normalized);
-          window.localStorage.setItem('codersera_email_verified', normalized);
-          setIsEmailVerifiedLocally(true);
-          setVerificationSent(true);
-          setStep('verify-email');
-          setVerificationError('');
-        }
-      })
-      .catch(() => setVerificationError('This verification link is invalid or expired. Please request a new link.'));
   }, [registrationDraftKey]);
-
-  // Synchronize cross-tab email verification
-  React.useEffect(() => {
-    const checkVerification = () => {
-      const targetEmail = (email || window.localStorage.getItem('codersera_pending_email') || '').trim().toLowerCase();
-      if (!targetEmail) return;
-      const v1 = window.localStorage.getItem('codersera_email_verified');
-      const v2 = window.sessionStorage.getItem('codersera_email_verified');
-      if ((v1 && v1.toLowerCase() === targetEmail) || (v2 && v2.toLowerCase() === targetEmail)) {
-        setIsEmailVerifiedLocally(true);
-        setVerificationError('');
-      }
-    };
-    checkVerification();
-    const handleStorage = (e: StorageEvent) => {
-      if (e.key === 'codersera_email_verified') checkVerification();
-    };
-    window.addEventListener('storage', handleStorage);
-    const interval = setInterval(checkVerification, 1500);
-    return () => {
-      window.removeEventListener('storage', handleStorage);
-      clearInterval(interval);
-    };
-  }, [email]);
 
   // Handle Photo Upload with strictly <= 1.00 MB validation
   const handlePhotoSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -256,12 +188,12 @@ export const RegistrationForm: React.FC<RegistrationFormProps> = ({
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
-  // Step 1: Validate details and check for duplicate before proceeding to verification
-  const handleProceedToVerification = async (e: React.FormEvent) => {
+  // Validate details and issue pass directly
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setGeneralError('');
+    setPhotoError('');
     setDuplicateTicketFound(null);
-    setShowDirectIssue(false);
 
     // Validation checks
     if (!fullName.trim() || !email.trim() || !rollNumber.trim() || !phoneNumber.trim()) {
@@ -269,8 +201,13 @@ export const RegistrationForm: React.FC<RegistrationFormProps> = ({
       return;
     }
 
+    if (!/^\S+@\S+\.\S+$/.test(email.trim())) {
+      setGeneralError('Please enter a valid email address.');
+      return;
+    }
+
     if (!photoBase64) {
-      setPhotoError('Please upload your photo for your student event badge.');
+      setPhotoError('Please upload your photo for your verified event pass.');
       return;
     }
 
@@ -293,70 +230,14 @@ export const RegistrationForm: React.FC<RegistrationFormProps> = ({
     };
     window.sessionStorage.setItem(registrationDraftKey, JSON.stringify(draft));
     window.localStorage.setItem(registrationDraftKey, JSON.stringify(draft));
-    window.sessionStorage.setItem('codersera_pending_email', email.trim().toLowerCase());
-    window.localStorage.setItem('codersera_pending_email', email.trim().toLowerCase());
 
-    if (!isEmailVerificationConfigured()) {
-      try {
-        await issueTicket();
-        return;
-      } catch (err: unknown) {
-        setGeneralError(err instanceof Error ? err.message : 'Unable to issue pass.');
-        return;
-      }
-    }
-
+    setIsSubmitting(true);
     try {
-      await sendRegistrationEmailLink(email.trim().toLowerCase());
-      setVerificationSent(true);
-      setStep('verify-email');
-    } catch (error: unknown) {
-      setGeneralError(emailVerificationError(error));
-      setShowDirectIssue(true);
-    }
-  };
-
-  // Step 2: Confirm email link & issue unique ticket
-  const handleConfirmVerification = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setVerificationError('');
-
-    setIsVerifying(true);
-    const pendingEmail = window.sessionStorage.getItem('codersera_pending_email')
-      || window.localStorage.getItem('codersera_pending_email')
-      || email.trim().toLowerCase();
-    try {
-      const verifiedEmail = window.sessionStorage.getItem('codersera_email_verified')
-        || window.localStorage.getItem('codersera_email_verified');
-      const verified = isEmailVerifiedLocally
-        || (verifiedEmail && verifiedEmail.toLowerCase() === pendingEmail.toLowerCase())
-        || await completeRegistrationEmailLink(pendingEmail);
-      if (!verified) {
-        setVerificationError('Open the verification link sent to your inbox before continuing, or click "Directly Issue Pass" below.');
-        setShowDirectIssue(true);
-        return;
-      }
       await issueTicket();
-    } catch (error: unknown) {
-      setVerificationError(error instanceof Error ? error.message : 'This verification link is invalid or expired. Please request a new link.');
-      setShowDirectIssue(true);
-    } finally {
-      setIsVerifying(false);
-    }
-  };
-
-  const handleResendEmail = async () => {
-    const targetEmail = (email || window.localStorage.getItem('codersera_pending_email') || '').trim().toLowerCase();
-    if (!targetEmail) return;
-    setResending(true);
-    setResendStatus('');
-    try {
-      await sendRegistrationEmailLink(targetEmail);
-      setResendStatus('A fresh verification link has been sent to your email.');
     } catch (err: unknown) {
-      setResendStatus(emailVerificationError(err));
+      setGeneralError(err instanceof Error ? err.message : 'Unable to issue pass.');
     } finally {
-      setResending(false);
+      setIsSubmitting(false);
     }
   };
 
@@ -370,7 +251,7 @@ export const RegistrationForm: React.FC<RegistrationFormProps> = ({
           </span>
           <button
             onClick={onCancel}
-            className="text-slate-400 hover:text-white text-xs font-mono transition-colors"
+            className="text-slate-400 hover:text-white text-xs font-mono transition-colors cursor-pointer"
           >
             ← Change Event
           </button>
@@ -397,13 +278,13 @@ export const RegistrationForm: React.FC<RegistrationFormProps> = ({
                 <button
                   id="view-duplicate-ticket-btn"
                   onClick={() => onViewExistingTicket(duplicateTicketFound)}
-                  className="px-4 py-2 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold text-xs shadow-md transition-all font-mono"
+                  className="px-4 py-2 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold text-xs shadow-md transition-all font-mono cursor-pointer"
                 >
                   View / Download My Pass
                 </button>
                 <button
                   onClick={() => setDuplicateTicketFound(null)}
-                  className="text-xs text-slate-400 hover:text-white"
+                  className="text-xs text-slate-400 hover:text-white cursor-pointer"
                 >
                   Dismiss
                 </button>
@@ -414,48 +295,27 @@ export const RegistrationForm: React.FC<RegistrationFormProps> = ({
       )}
 
       {generalError && !duplicateTicketFound && (
-        <div className="mb-6 p-4 rounded-xl bg-red-950/40 border border-red-500/50 text-red-200 text-xs font-mono space-y-3">
-          <div className="flex items-center gap-2">
-            <AlertCircle className="w-4 h-4 text-red-400 shrink-0" />
-            <span>{generalError}</span>
-          </div>
-          {showDirectIssue && (
-            <div className="pt-2 border-t border-red-500/30 flex items-center justify-between gap-3">
-              <span className="text-[11px] text-slate-300">You can also bypass email check and generate your pass directly:</span>
-              <button
-                type="button"
-                onClick={async () => {
-                  try {
-                    await issueTicket();
-                  } catch (err: unknown) {
-                    setGeneralError(err instanceof Error ? err.message : 'Unable to issue pass.');
-                  }
-                }}
-                className="px-3 py-1.5 rounded-lg bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold text-xs font-mono shrink-0 shadow-md transition-all"
-              >
-                Issue Pass Directly
-              </button>
-            </div>
-          )}
+        <div className="mb-6 p-4 rounded-xl bg-red-950/40 border border-red-500/50 text-red-200 text-xs font-mono flex items-center gap-2">
+          <AlertCircle className="w-4 h-4 text-red-400 shrink-0" />
+          <span>{generalError}</span>
         </div>
       )}
 
-      {/* STEP 1: Details & Photo Upload */}
-      {step === 'details' && (
-        <form onSubmit={handleProceedToVerification} className="space-y-6">
-          <div className="bg-[#121215] border border-[#27272a] rounded-2xl p-5 sm:p-7 space-y-5">
-            <div className="border-b border-[#27272a] pb-3 flex items-center justify-between">
-              <div>
-                <h3 className="text-base font-bold text-white flex items-center gap-2 font-display">
-                  <User className="w-4 h-4 text-cyan-400" />
-                  <span>Pass Holder Information</span>
-                </h3>
-                <span className="text-xs text-slate-400">Official digital pass issuance</span>
-              </div>
-              <span className="text-xs font-mono text-cyan-400 bg-cyan-950/80 px-2.5 py-1 rounded border border-cyan-500/30">
-                Step 1 of 2
-              </span>
+      {/* Registration Form */}
+      <form onSubmit={handleSubmit} className="space-y-6">
+        <div className="bg-[#121215] border border-[#27272a] rounded-2xl p-5 sm:p-7 space-y-5">
+          <div className="border-b border-[#27272a] pb-3 flex items-center justify-between">
+            <div>
+              <h3 className="text-base font-bold text-white flex items-center gap-2 font-display">
+                <User className="w-4 h-4 text-cyan-400" />
+                <span>Pass Holder Information</span>
+              </h3>
+              <span className="text-xs text-slate-400">Official digital pass issuance</span>
             </div>
+            <span className="text-xs font-mono text-cyan-400 bg-cyan-950/80 px-2.5 py-1 rounded border border-cyan-500/30">
+              Verified Issuance
+            </span>
+          </div>
 
             {/* Full Name */}
             <div>
@@ -492,7 +352,7 @@ export const RegistrationForm: React.FC<RegistrationFormProps> = ({
 
               <div>
                 <label className="block text-xs font-medium text-slate-300 mb-1.5">
-                  Attendee / Student ID or Roll No. <span className="text-cyan-400">*</span>
+                  Registration / Attendee ID (or Student Roll No.) <span className="text-cyan-400">*</span>
                 </label>
                 <input
                   id="reg-roll"
@@ -500,7 +360,7 @@ export const RegistrationForm: React.FC<RegistrationFormProps> = ({
                   required
                   value={rollNumber}
                   onChange={(e) => setRollNumber(e.target.value)}
-                  placeholder="e.g. DEV-2026-088 or Roll No."
+                  placeholder="e.g. CE-DEV-2026 or College Roll No."
                   className="w-full px-4 py-2.5 rounded-xl bg-[#18181b] border border-[#27272a] text-white text-sm focus:border-cyan-400 focus:outline-none transition-all uppercase font-mono"
                 />
               </div>
@@ -708,116 +568,24 @@ export const RegistrationForm: React.FC<RegistrationFormProps> = ({
             <button
               id="proceed-verify-btn"
               type="submit"
-              className="flex items-center gap-2 px-6 py-3 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold text-sm shadow-[0_0_20px_rgba(56,189,248,0.25)] transition-all ml-auto font-mono"
+              disabled={isSubmitting}
+              className="flex items-center gap-2 px-6 py-3 rounded-xl bg-cyan-500 hover:bg-cyan-400 disabled:opacity-50 text-slate-950 font-bold text-sm shadow-[0_0_20px_rgba(56,189,248,0.25)] transition-all ml-auto font-mono cursor-pointer"
             >
-              <span>Verify Email & Generate Pass</span>
-              <ArrowRight className="w-4 h-4" />
+              {isSubmitting ? (
+                <>
+                  <RefreshCw className="w-4 h-4 animate-spin" />
+                  <span>Issuing Pass...</span>
+                </>
+              ) : (
+                <>
+                  <Sparkles className="w-4 h-4" />
+                  <span>Generate Verified Event Pass</span>
+                  <ArrowRight className="w-4 h-4" />
+                </>
+              )}
             </button>
           </div>
         </form>
-      )}
-
-      {/* STEP 2: Email Verification Link */}
-      {step === 'verify-email' && (
-        <div className="bg-[#121215] border border-[#27272a] rounded-2xl p-6 sm:p-8">
-          <div className="text-center max-w-md mx-auto">
-            <div className="w-12 h-12 rounded-2xl bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-center text-cyan-400 mx-auto mb-4 shadow-[0_0_15px_rgba(56,189,248,0.15)]">
-              <Mail className="w-6 h-6" />
-            </div>
-
-            <h3 className="text-xl font-bold text-white font-display">Check Your Email</h3>
-            <p className="text-xs text-slate-400 mt-2">
-              We sent a secure verification link to <strong className="text-cyan-300 font-mono">{email}</strong>.
-            </p>
-
-            {isEmailVerifiedLocally ? (
-              <div className="my-5 p-4 rounded-xl bg-emerald-950/40 border border-emerald-500/50 text-emerald-200">
-                <div className="flex items-center justify-center gap-2 font-mono text-xs text-emerald-300">
-                  <CheckCircle className="w-4 h-4 text-emerald-400" />
-                  <span>Email verified! Ready to generate your event pass.</span>
-                </div>
-              </div>
-            ) : (
-              <div className="my-5 p-4 rounded-xl bg-[#18181b] border border-dashed border-cyan-500/40">
-                <span className="text-[10px] uppercase font-mono text-slate-400 block mb-1">
-                  Verification link sent
-                </span>
-                <span className="text-[10px] text-slate-500 font-mono block mt-1">
-                  Open the link in your inbox (or any tab), then return here to issue your badge.
-                </span>
-              </div>
-            )}
-
-            {verificationError && (
-              <div className="mb-4 p-3 rounded-lg bg-red-950/60 border border-red-500 text-red-200 text-xs font-mono">
-                {verificationError}
-              </div>
-            )}
-
-            {resendStatus && (
-              <div className="mb-4 p-2 rounded-lg bg-cyan-950/50 border border-cyan-500/30 text-cyan-300 text-xs font-mono">
-                {resendStatus}
-              </div>
-            )}
-
-            <form onSubmit={handleConfirmVerification} className="space-y-4">
-              <div className="flex items-center gap-3">
-                <button
-                  type="button"
-                  onClick={() => setStep('details')}
-                  className="flex-1 py-2.5 rounded-xl border border-[#27272a] text-slate-400 hover:text-white text-xs font-mono"
-                >
-                  Back
-                </button>
-
-                <button
-                  id="confirm-ticket-generation-btn"
-                  type="submit"
-                  disabled={isVerifying}
-                  className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl bg-cyan-500 hover:bg-cyan-400 disabled:opacity-50 text-slate-950 font-bold text-xs shadow-[0_0_20px_rgba(56,189,248,0.25)] transition-all font-mono"
-                >
-                  {isVerifying ? (
-                    <>
-                      <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                      <span>Issuing Pass...</span>
-                    </>
-                  ) : (
-                    <>
-                      <Sparkles className="w-3.5 h-3.5" />
-                      <span>Issue My Event Pass</span>
-                    </>
-                  )}
-                </button>
-              </div>
-            </form>
-
-            <div className="mt-5 pt-4 border-t border-[#27272a] flex flex-col items-center gap-2.5">
-              <button
-                type="button"
-                disabled={resending}
-                onClick={handleResendEmail}
-                className="text-xs text-cyan-400 hover:text-cyan-300 underline font-mono"
-              >
-                {resending ? 'Sending new link...' : 'Resend verification email'}
-              </button>
-
-              <button
-                type="button"
-                onClick={async () => {
-                  try {
-                    await issueTicket();
-                  } catch (err: unknown) {
-                    setVerificationError(err instanceof Error ? err.message : 'Unable to issue pass.');
-                  }
-                }}
-                className="text-xs text-slate-400 hover:text-white underline font-mono pt-1"
-              >
-                Didn't receive email? Issue pass directly
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 };
